@@ -6,7 +6,7 @@ class AppPrincipal(tk.Tk):
         super().__init__()
         self.title("TFC Gomez - Onufrijczuk")
         # Hacemos la ventana principal más grande para que quepa el gráfico y los controles
-        self.geometry("1100x650") 
+        self.geometry("1150x750") 
 
         self.datos = {
             "facilitadores": None,

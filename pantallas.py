@@ -91,7 +91,7 @@ class PantallaAlgoritmo(tk.Frame):
         frame_izq = tk.Frame(self, padx=10, pady=10)
         frame_izq.grid(row=0, column=0, sticky="nsew")
 
-        lf_grafico = ttk.LabelFrame(frame_izq, text="Grafico :")
+        lf_grafico = ttk.LabelFrame(frame_izq, text="Gráfico ")
         lf_grafico.pack(fill="both", expand=True, pady=10)
 
         fig = Figure(figsize=(5, 4), dpi=100)
@@ -101,7 +101,7 @@ class PantallaAlgoritmo(tk.Frame):
         promedio = np.log(generaciones + 1) * 6 + np.random.rand(150) * 2
         maximo = promedio + np.random.rand(150) * 4 + 2
         
-        ax.fill_between(generaciones, maximo, color='red', label='Maximo')
+        ax.fill_between(generaciones, maximo, color='red', label='Máximo')
         ax.fill_between(generaciones, promedio, color='lime', label='Promedio')
         
         ax.set_title('Evolución de la Población', fontsize=10, fontweight='bold')
@@ -121,7 +121,8 @@ class PantallaAlgoritmo(tk.Frame):
         frame_der.grid(row=0, column=1, sticky="nsew")
 
         lf_algoritmo = ttk.LabelFrame(frame_der, text="Datos del Algoritmo")
-        lf_algoritmo.pack(fill="both", expand=True)
+        # Le quitamos el expand=True para que deje espacio al panel de abajo
+        lf_algoritmo.pack(fill="both", pady=(0, 10))
 
         # --- Condición de Fin y Optimización Colonia de Hormiga ---
         frame_top_der = tk.Frame(lf_algoritmo)
@@ -131,7 +132,6 @@ class PantallaAlgoritmo(tk.Frame):
         lf_fin = ttk.LabelFrame(frame_top_der, text="Condición de Fin")
         lf_fin.pack(side="left", fill="both", expand=True, padx=5)
         
-        # Centrar contenido internamente
         lf_fin.columnconfigure(0, weight=1)
         lf_fin.columnconfigure(1, weight=1)
 
@@ -148,7 +148,6 @@ class PantallaAlgoritmo(tk.Frame):
         lf_och = ttk.LabelFrame(frame_top_der, text="Optimización Colonia de Hormiga")
         lf_och.pack(side="right", fill="both", expand=True, padx=5)
 
-        # Centrar contenido internamente
         lf_och.columnconfigure(0, weight=1)
         lf_och.columnconfigure(1, weight=1)
 
@@ -165,19 +164,19 @@ class PantallaAlgoritmo(tk.Frame):
         ttk.Entry(lf_och, width=10).grid(row=3, column=1, sticky="w", padx=2, pady=2)
 
         # --- Técnicas de Selección ---
-        lf_seleccion = ttk.LabelFrame(lf_algoritmo, text="Técnicas de Seleccion", labelanchor="n")
+        lf_seleccion = ttk.LabelFrame(lf_algoritmo, text="Técnicas de Selección", labelanchor="n")
         lf_seleccion.pack(fill="x", padx=10, pady=5)
         
         frame_torneo = tk.Frame(lf_seleccion, bd=1, relief="ridge")
         frame_torneo.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         
         tk.Label(frame_torneo, text="Torneo").grid(row=0, column=0, columnspan=2, pady=(2,5))
-        tk.Label(frame_torneo, text="% Seleccion Torneo :").grid(row=1, column=0, sticky="e", padx=5)
+        tk.Label(frame_torneo, text="% Selección Torneo :").grid(row=1, column=0, sticky="e", padx=5)
         ent_torneo = ttk.Entry(frame_torneo, width=12)
         ent_torneo.insert(0, "0.05")
         ent_torneo.grid(row=1, column=1, sticky="w", padx=5)
 
-        tk.Label(frame_torneo, text="Presion Selectiva :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+        tk.Label(frame_torneo, text="Presión Selectiva :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
         ent_presion = ttk.Entry(frame_torneo, width=12)
         ent_presion.insert(0, "20")
         ent_presion.grid(row=2, column=1, sticky="w", padx=5)
@@ -186,13 +185,13 @@ class PantallaAlgoritmo(tk.Frame):
         frame_ruleta.pack(side="right", fill="both", expand=True, padx=5, pady=5)
         
         tk.Label(frame_ruleta, text="Ruleta").grid(row=0, column=0, columnspan=2)
-        tk.Label(frame_ruleta, text="% Seleccion Ruleta :").grid(row=1, column=0, sticky="e", padx=5)
+        tk.Label(frame_ruleta, text="% Selección Ruleta :").grid(row=1, column=0, sticky="e", padx=5)
         ent_ruleta = ttk.Entry(frame_ruleta, width=12)
         ent_ruleta.insert(0, "0.94")
         ent_ruleta.grid(row=1, column=1, sticky="w", padx=5)
 
         tk.Label(frame_ruleta, text="Elitsta").grid(row=2, column=0, columnspan=2)
-        tk.Label(frame_ruleta, text="% Seleccion Elitista :").grid(row=3, column=0, sticky="e", padx=5)
+        tk.Label(frame_ruleta, text="% Selección Elitista :").grid(row=3, column=0, sticky="e", padx=5)
         ent_elitista = ttk.Entry(frame_ruleta, width=12)
         ent_elitista.insert(0, "0.01")
         ent_elitista.grid(row=3, column=1, sticky="w", padx=5, pady=(0,5))
@@ -206,17 +205,16 @@ class PantallaAlgoritmo(tk.Frame):
         lf_cruza.pack(side="left", fill="both", expand=True, padx=5)
         
         frame_cruza_in = tk.Frame(lf_cruza)
-        frame_cruza_in.pack(pady=20)
+        frame_cruza_in.pack(expand=True)
         tk.Label(frame_cruza_in, text="Puntos Cruza :").grid(row=0, column=0, sticky="e")
         ent_cruza = ttk.Entry(frame_cruza_in, width=12)
         ent_cruza.insert(0, "20")
         ent_cruza.grid(row=0, column=1, sticky="w", padx=5)
 
         # Operador de Mutacion 
-        lf_mutacion = ttk.LabelFrame(frame_operadores, text="Operador de Mutacion", labelanchor="n")
+        lf_mutacion = ttk.LabelFrame(frame_operadores, text="Operador de Mutación", labelanchor="n")
         lf_mutacion.pack(side="right", fill="both", expand=True, padx=5)
         
-        #padding vertical 
         tk.Label(lf_mutacion, text="Probabilidad :").grid(row=0, column=0, sticky="e", padx=2, pady=(10, 2))
         ent_prob = ttk.Entry(lf_mutacion, width=12)
         ent_prob.insert(0, "0.02")
@@ -242,9 +240,33 @@ class PantallaAlgoritmo(tk.Frame):
         ent_pfc.insert(0, "0.25")
         ent_pfc.grid(row=4, column=1, sticky="w", padx=2, pady=(2, 10))
         
+
+        # =========================================================
+        # NUEVO FRAME: DATOS DE LA EJECUCIÓN
+        # =========================================================
+        lf_ejecucion = tk.LabelFrame(frame_der, text=" Datos de la Ejecución ", font=("Arial", 11, "bold"), fg="#333333")
+        lf_ejecucion.pack(fill="both", expand=True, pady=(0, 10), padx=5)
+
+        # Creamos un marco interno invisible para centrar la lista perfectamente
+        frame_datos = tk.Frame(lf_ejecucion)
+        frame_datos.pack(expand=True)
+
+        # Tiempo
+        self.lbl_tiempo = tk.Label(frame_datos, text="Tiempo de ejecución: --", font=("Arial", 15, "bold"), fg="#000000")
+        self.lbl_tiempo.pack(anchor="w", pady=5)
+
+        # Generación
+        self.lbl_generacion = tk.Label(frame_datos, text="Número de generación: --", font=("Arial", 15, "bold"), fg="#000000")
+        self.lbl_generacion.pack(anchor="w", pady=5)
+
+        # Aptitud
+        self.lbl_aptitud = tk.Label(frame_datos, text="Función de aptitud: --", font=("Arial", 15, "bold"), fg="#000000")
+        self.lbl_aptitud.pack(anchor="w", pady=5)
+
+
         # --- BOTONES DE ACCIÓN ---
         frame_botones = tk.Frame(frame_der)
-        frame_botones.pack(side="bottom", fill="x", pady=15)
+        frame_botones.pack(side="bottom", fill="x", pady=5)
 
         btn_ejecutar = tk.Button(frame_botones, text="Ejecutar Algoritmo", bg="#4CAF50", fg="white", font=("Arial", 10, "bold"),
                                  command=lambda: print("Próximamente: Ejecutar algoritmo..."))
