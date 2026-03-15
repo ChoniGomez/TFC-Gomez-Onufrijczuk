@@ -1,20 +1,17 @@
 import tkinter as tk
 from pantallas import PantallaInicio
+# IMPORTANTE: Importamos tu nueva clase desde tu archivo gestor_datos.py
+from gestor_datos import GestorDatos 
 
 class AppPrincipal(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("TFC Gomez - Onufrijczuk")
-        # Hacemos la ventana principal más grande para que quepa el gráfico y los controles
-        self.geometry("1150x750") 
+        self.geometry("1100x750") 
 
-        self.datos = {
-            "facilitadores": None,
-            "horas": None,
-            "trayectos": None,
-            "fac_trayectos": None,
-            "disponibilidad": None
-        }
+        # ¡AQUÍ ESTÁ LA MAGIA! 
+        # Instanciamos la clase y la guardamos en self.gestor
+        self.gestor = GestorDatos() 
 
         self.contenedor = tk.Frame(self)
         self.contenedor.pack(side="top", fill="both", expand=True)

@@ -14,7 +14,8 @@ class PantallaInicio(tk.Frame):
         tk.Button(self, text="INICIAR", width=20, height=2, bg="#4CAF50", fg="white", font=("Arial", 12, "bold"),
                   command=lambda: controlador.mostrar_pantalla(PantallaCarga)).pack()
 
-# --- PANTALLA 2: CARGA DE DATOS CSV  ---
+
+# --- PANTALLA 2: CARGA DE DATOS CSV ---
 class PantallaCarga(tk.Frame):
     def __init__(self, parent, controlador):
         super().__init__(parent)
@@ -23,12 +24,13 @@ class PantallaCarga(tk.Frame):
 
         tk.Label(self, text="Carga de Archivos CSV", font=("Arial", 16, "bold"), pady=20).pack()
 
+        # Opciones con el nuevo botón "horarios_clases"
         opciones = [
             ("Cargar Facilitadores", "facilitadores"),
-            ("Cargar Horas a Cumplir", "horas"),
             ("Cargar Trayectos", "trayectos"),
             ("Cargar Facilitadores - Trayectos", "fac_trayectos"),
-            ("Cargar Disponibilidad Horaria", "disponibilidad")
+            ("Cargar Disponibilidad Horaria", "disponibilidad"),
+            ("Cargar horarios de clases", "horarios_clases")
         ]
 
         # Contenedor central para alinear los botones
@@ -37,42 +39,49 @@ class PantallaCarga(tk.Frame):
 
         for texto, clave in opciones:
             frame_fila = tk.Frame(frame_central)
-            frame_fila.pack(pady=8, fill="x")
+            frame_fila.pack(pady=10, fill="x")
 
-            btn = tk.Button(frame_fila, text=texto, width=35, anchor="w",
+            # Botón SIN el ipady adentro, con cursor de manito
+            btn = tk.Button(frame_fila, text=texto, width=40, anchor="w",
+                            font=("Arial", 11), cursor="hand2",
                             command=lambda c=clave: self.seleccionar_archivo(c))
-            btn.pack(side="left")
+            # EL IPADY VA AQUÍ ADENTRO DEL PACK:
+            btn.pack(side="left", ipady=5)
 
-            estado_inicial = "✅" if self.controlador.datos[clave] is not None else "❌"
-            color_inicial = "green" if self.controlador.datos[clave] is not None else "red"
+            # Le preguntamos al gestor si ya tiene los datos de esta clave
+            cargado = self.controlador.gestor.tiene_datos(clave)
             
-            lbl_check = tk.Label(frame_fila, text=estado_inicial, fg=color_inicial, font=("Arial", 12, "bold"), padx=10)
+            estado_inicial = "✅" if cargado else "❌"
+            color_inicial = "green" if cargado else "red"
+            
+            lbl_check = tk.Label(frame_fila, text=estado_inicial, fg=color_inicial, font=("Arial", 14, "bold"), padx=15)
             lbl_check.pack(side="left")
             
             self.checks_visuales[clave] = lbl_check
 
         # Botón Siguiente direcciona a Pantalla del Algoritmo 
         btn_siguiente = tk.Button(self, text="Siguiente →", width=15, bg="#2196F3", fg="white",
+                                  font=("Arial", 12, "bold"), cursor="hand2",
                                   command=self.ir_a_algoritmo)
-        btn_siguiente.pack(side="bottom", pady=30)
+        # EL IPADY DEL BOTÓN SIGUIENTE VA AQUÍ:
+        btn_siguiente.pack(side="bottom", pady=40, ipady=5)
 
     def seleccionar_archivo(self, clave):
         ruta = filedialog.askopenfilename(filetypes=[("Archivos CSV", "*.csv")])
         if ruta:
-            try:
-                self.controlador.datos[clave] = pd.read_csv(ruta)
+            # Llamamos a nuestra clase GestorDatos
+            exito, mensaje = self.controlador.gestor.cargar_csv(clave, ruta)
+            if exito:
                 self.checks_visuales[clave].config(text="✅", fg="green")
-            except Exception as e:
-                messagebox.showerror("Error", f"No se pudo cargar el archivo: {e}")
+            else:
+                messagebox.showerror("Error", mensaje)
 
     def ir_a_algoritmo(self):
-        cargados = [v for v in self.controlador.datos.values() if v is not None]
-        if not cargados:
-            messagebox.showwarning("Atención", "Carga al menos un archivo para continuar.")
+        # El gestor ahora exige que estén los archivos cargados
+        if not self.controlador.gestor.estan_datos_listos():
+            messagebox.showwarning("Atención", "Carga todos los archivos CSV para continuar.")
         else:
-            # Pasa a la pantalla de algoritmo
             self.controlador.mostrar_pantalla(PantallaAlgoritmo)
-
 
 # --- PANTALLA 3: ALGORITMO ---
 class PantallaAlgoritmo(tk.Frame):
