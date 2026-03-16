@@ -5,26 +5,32 @@ import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-# --- PANTALLA 1: INICIO ---
 class PantallaInicio(tk.Frame):
+    """
+    Vista inicial de la aplicación.
+    Provee el punto de entrada principal al sistema de asignación.
+    """
     def __init__(self, parent, controlador):
         super().__init__(parent)
         tk.Label(self, text="TFC Gomez - Onufrijczuk", font=("Arial", 20, "bold"), pady=50).pack()
         
         tk.Button(self, text="INICIAR", width=20, height=2, bg="#4CAF50", fg="white", font=("Arial", 12, "bold"),
-                  command=lambda: controlador.mostrar_pantalla(PantallaCarga)).pack()
+                  command=lambda: controlador.mostrarPantalla(PantallaCarga)).pack()
 
 
-# --- PANTALLA 2: CARGA DE DATOS CSV ---
 class PantallaCarga(tk.Frame):
+    """
+    Vista de gestión de datos.
+    Permite la selección y carga en memoria de los archivos CSV requeridos.
+    """
     def __init__(self, parent, controlador):
         super().__init__(parent)
         self.controlador = controlador
-        self.checks_visuales = {}
+        self.checksVisuales = {}
 
         tk.Label(self, text="Carga de Archivos CSV", font=("Arial", 16, "bold"), pady=20).pack()
 
-        # Opciones con el nuevo botón "horarios_clases"
+        # Definición de los módulos de datos requeridos para la ejecución
         opciones = [
             ("Cargar Facilitadores", "facilitadores"),
             ("Cargar Trayectos", "trayectos"),
@@ -33,58 +39,63 @@ class PantallaCarga(tk.Frame):
             ("Cargar horarios de clases", "horarios_clases")
         ]
 
-        # Contenedor central para alinear los botones
-        frame_central = tk.Frame(self)
-        frame_central.pack()
+        # Contenedor central para la alineación de los elementos de carga
+        frameCentral = tk.Frame(self)
+        frameCentral.pack()
 
         for texto, clave in opciones:
-            frame_fila = tk.Frame(frame_central)
-            frame_fila.pack(pady=10, fill="x")
+            frameFila = tk.Frame(frameCentral)
+            frameFila.pack(pady=10, fill="x")
 
-            # Botón SIN el ipady adentro, con cursor de manito
-            btn = tk.Button(frame_fila, text=texto, width=40, anchor="w",
+            btn = tk.Button(frameFila, text=texto, width=40, anchor="w",
                             font=("Arial", 11), cursor="hand2",
-                            command=lambda c=clave: self.seleccionar_archivo(c))
-            # EL IPADY VA AQUÍ ADENTRO DEL PACK:
+                            command=lambda c=clave: self.seleccionarArchivo(c))
             btn.pack(side="left", ipady=5)
 
-            # Le preguntamos al gestor si ya tiene los datos de esta clave
-            cargado = self.controlador.gestor.tiene_datos(clave)
+            # Verificación del estado de carga en el gestor de datos global
+            cargado = self.controlador.gestor.tieneDatos(clave)
             
-            estado_inicial = "✅" if cargado else "❌"
-            color_inicial = "green" if cargado else "red"
+            estadoInicial = "✅" if cargado else "❌"
+            colorInicial = "green" if cargado else "red"
             
-            lbl_check = tk.Label(frame_fila, text=estado_inicial, fg=color_inicial, font=("Arial", 14, "bold"), padx=15)
-            lbl_check.pack(side="left")
+            lblCheck = tk.Label(frameFila, text=estadoInicial, fg=colorInicial, font=("Arial", 14, "bold"), padx=15)
+            lblCheck.pack(side="left")
             
-            self.checks_visuales[clave] = lbl_check
+            self.checksVisuales[clave] = lblCheck
 
-        # Botón Siguiente direcciona a Pantalla del Algoritmo 
-        btn_siguiente = tk.Button(self, text="Siguiente →", width=15, bg="#2196F3", fg="white",
-                                  font=("Arial", 12, "bold"), cursor="hand2",
-                                  command=self.ir_a_algoritmo)
-        # EL IPADY DEL BOTÓN SIGUIENTE VA AQUÍ:
-        btn_siguiente.pack(side="bottom", pady=40, ipady=5)
+        # Botón de navegación hacia la vista de configuración del algoritmo
+        btnSiguiente = tk.Button(self, text="Siguiente →", width=15, bg="#2196F3", fg="white",
+                                 font=("Arial", 12, "bold"), cursor="hand2",
+                                 command=self.irAAlgoritmo)
+        btnSiguiente.pack(side="bottom", pady=40, ipady=5)
 
-    def seleccionar_archivo(self, clave):
+    def seleccionarArchivo(self, clave):
+        """
+        Abre un cuadro de diálogo para la selección del archivo y delega 
+        la persistencia en memoria al gestor de datos.
+        """
         ruta = filedialog.askopenfilename(filetypes=[("Archivos CSV", "*.csv")])
         if ruta:
-            # Llamamos a nuestra clase GestorDatos
-            exito, mensaje = self.controlador.gestor.cargar_csv(clave, ruta)
+            exito, mensaje = self.controlador.gestor.cargarCsv(clave, ruta)
             if exito:
-                self.checks_visuales[clave].config(text="✅", fg="green")
+                self.checksVisuales[clave].config(text="✅", fg="green")
             else:
                 messagebox.showerror("Error", mensaje)
 
-    def ir_a_algoritmo(self):
-        # El gestor ahora exige que estén los archivos cargados
-        if not self.controlador.gestor.estan_datos_listos():
-            messagebox.showwarning("Atención", "Carga todos los archivos CSV para continuar.")
+    def irAAlgoritmo(self):
+        """
+        Validación de requisitos previos antes de inicializar la vista del algoritmo.
+        """
+        if not self.controlador.gestor.estanDatosListos():
+            messagebox.showwarning("Atención", "Es necesario cargar todos los archivos CSV para continuar.")
         else:
-            self.controlador.mostrar_pantalla(PantallaAlgoritmo)
+            self.controlador.mostrarPantalla(PantallaAlgoritmo)
 
-# --- PANTALLA 3: ALGORITMO ---
+
 class PantallaAlgoritmo(tk.Frame):
+    """
+    Vista principal de ejecución y monitoreo del Algoritmo de Optimización.
+    """
     def __init__(self, parent, controlador):
         super().__init__(parent)
         self.controlador = controlador
@@ -93,19 +104,23 @@ class PantallaAlgoritmo(tk.Frame):
         self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)
 
-        self.crear_panel_izquierdo()
-        self.crear_panel_derecho()
+        self.crearPanelIzquierdo()
+        self.crearPanelDerecho()
 
-    def crear_panel_izquierdo(self):
-        frame_izq = tk.Frame(self, padx=10, pady=10)
-        frame_izq.grid(row=0, column=0, sticky="nsew")
+    def crearPanelIzquierdo(self):
+        """
+        Inicializa y renderiza el panel de gráficos estadísticos de evolución.
+        """
+        frameIzq = tk.Frame(self, padx=10, pady=10)
+        frameIzq.grid(row=0, column=0, sticky="nsew")
 
-        lf_grafico = ttk.LabelFrame(frame_izq, text="Gráfico ")
-        lf_grafico.pack(fill="both", expand=True, pady=10)
+        lfGrafico = ttk.LabelFrame(frameIzq, text="Gráfico de Evolución")
+        lfGrafico.pack(fill="both", expand=True, pady=10)
 
         fig = Figure(figsize=(5, 4), dpi=100)
         ax = fig.add_subplot(111)
         
+        # Simulación inicial de datos para la vista del gráfico
         generaciones = np.arange(0, 150)
         promedio = np.log(generaciones + 1) * 6 + np.random.rand(150) * 2
         maximo = promedio + np.random.rand(150) * 4 + 2
@@ -121,174 +136,181 @@ class PantallaAlgoritmo(tk.Frame):
         ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25), ncol=2)
         fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, master=lf_grafico)
+        canvas = FigureCanvasTkAgg(fig, master=lfGrafico)
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=5, pady=5)
 
-    def crear_panel_derecho(self):
-        frame_der = tk.Frame(self, padx=10, pady=10)
-        frame_der.grid(row=0, column=1, sticky="nsew")
+    def crearPanelDerecho(self):
+        """
+        Inicializa y renderiza el panel de configuración de parámetros del algoritmo 
+        y las métricas de ejecución.
+        """
+        frameDer = tk.Frame(self, padx=10, pady=10)
+        frameDer.grid(row=0, column=1, sticky="nsew")
 
-        lf_algoritmo = ttk.LabelFrame(frame_der, text="Datos del Algoritmo")
-        # Le quitamos el expand=True para que deje espacio al panel de abajo
-        lf_algoritmo.pack(fill="both", pady=(0, 10))
+        lfAlgoritmo = ttk.LabelFrame(frameDer, text="Parámetros del Algoritmo")
+        lfAlgoritmo.pack(fill="both", pady=(0, 10))
 
-        # --- Condición de Fin y Optimización Colonia de Hormiga ---
-        frame_top_der = tk.Frame(lf_algoritmo)
-        frame_top_der.pack(fill="x", pady=5, padx=5)
+        # Contenedor superior derecho
+        frameTopDer = tk.Frame(lfAlgoritmo)
+        frameTopDer.pack(fill="x", pady=5, padx=5)
 
-        # 1. Condición de Fin (Mitad Izquierda)
-        lf_fin = ttk.LabelFrame(frame_top_der, text="Condición de Fin")
-        lf_fin.pack(side="left", fill="both", expand=True, padx=5)
+        # Configuración de criterios de finalización
+        lfFin = ttk.LabelFrame(frameTopDer, text="Condición de Fin")
+        lfFin.pack(side="left", fill="both", expand=True, padx=5)
         
-        lf_fin.columnconfigure(0, weight=1)
-        lf_fin.columnconfigure(1, weight=1)
-
-        tk.Label(lf_fin, text="Número de Generaciones :").grid(row=0, column=0, sticky="e", padx=2, pady=5)
-        ttk.Entry(lf_fin, width=10).grid(row=0, column=1, sticky="w", padx=2, pady=5)
+        lfFin.columnconfigure(0, weight=1)
+        lfFin.columnconfigure(1, weight=1)
         
-        tk.Label(lf_fin, text="Soluciones Deseadas :").grid(row=1, column=0, sticky="e", padx=2, pady=5)
-        ttk.Entry(lf_fin, width=10).grid(row=1, column=1, sticky="w", padx=2, pady=5)
+        # Asignación de peso dinámico a las filas para distribución vertical equitativa
+        lfFin.rowconfigure(0, weight=1)
+        lfFin.rowconfigure(1, weight=1)
+        lfFin.rowconfigure(2, weight=1)
+
+        tk.Label(lfFin, text="Número de Generaciones :").grid(row=0, column=0, sticky="e", padx=2, pady=15)
+        ttk.Entry(lfFin, width=10).grid(row=0, column=1, sticky="w", padx=2, pady=15)
         
-        tk.Label(lf_fin, text="Minutos de Ejecución :").grid(row=2, column=0, sticky="e", padx=2, pady=5)
-        ttk.Entry(lf_fin, width=10).grid(row=2, column=1, sticky="w", padx=2, pady=5)
-
-        # 2. Optimización Colonia de Hormiga (Mitad Derecha)
-        lf_och = ttk.LabelFrame(frame_top_der, text="Optimización Colonia de Hormiga")
-        lf_och.pack(side="right", fill="both", expand=True, padx=5)
-
-        lf_och.columnconfigure(0, weight=1)
-        lf_och.columnconfigure(1, weight=1)
-
-        tk.Label(lf_och, text="Número de Hormigas :").grid(row=0, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lf_och, width=10).grid(row=0, column=1, sticky="w", padx=2, pady=2)
+        tk.Label(lfFin, text="Soluciones Deseadas :").grid(row=1, column=0, sticky="e", padx=2, pady=15)
+        ttk.Entry(lfFin, width=10).grid(row=1, column=1, sticky="w", padx=2, pady=15)
         
-        tk.Label(lf_och, text="Feromona Inicial :").grid(row=1, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lf_och, width=10).grid(row=1, column=1, sticky="w", padx=2, pady=2)
+        tk.Label(lfFin, text="Minutos de Ejecución :").grid(row=2, column=0, sticky="e", padx=2, pady=15)
+        ttk.Entry(lfFin, width=10).grid(row=2, column=1, sticky="w", padx=2, pady=15)
+
+        # Parámetros del Algoritmo de Colonia de Hormigas (OCH)
+        lfOch = ttk.LabelFrame(frameTopDer, text="Optimización Colonia de Hormigas")
+        lfOch.pack(side="right", fill="both", expand=True, padx=5)
+
+        lfOch.columnconfigure(0, weight=1)
+        lfOch.columnconfigure(1, weight=1)
+
+        tk.Label(lfOch, text="Número de Hormigas :").grid(row=0, column=0, sticky="e", padx=2, pady=2)
+        ttk.Entry(lfOch, width=10).grid(row=0, column=1, sticky="w", padx=2, pady=2)
+
+        tk.Label(lfOch, text="Grupo de Hormigas :").grid(row=1, column=0, sticky="e", padx=2, pady=2)
+        ttk.Entry(lfOch, width=10).grid(row=1, column=1, sticky="w", padx=2, pady=2)
         
-        tk.Label(lf_och, text="Peso Heurístico :").grid(row=2, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lf_och, width=10).grid(row=2, column=1, sticky="w", padx=2, pady=2)
-
-        tk.Label(lf_och, text="Peso Feromona :").grid(row=3, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lf_och, width=10).grid(row=3, column=1, sticky="w", padx=2, pady=2)
-
-        # --- Técnicas de Selección ---
-        lf_seleccion = ttk.LabelFrame(lf_algoritmo, text="Técnicas de Selección", labelanchor="n")
-        lf_seleccion.pack(fill="x", padx=10, pady=5)
+        tk.Label(lfOch, text="Feromona Inicial :").grid(row=2, column=0, sticky="e", padx=2, pady=2)
+        ttk.Entry(lfOch, width=10).grid(row=2, column=1, sticky="w", padx=2, pady=2)
         
-        frame_torneo = tk.Frame(lf_seleccion, bd=1, relief="ridge")
-        frame_torneo.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        tk.Label(lfOch, text="Tasa Evaporación Feromona :").grid(row=3, column=0, sticky="e", padx=2, pady=2)
+        ttk.Entry(lfOch, width=10).grid(row=3, column=1, sticky="w", padx=2, pady=2)
+
+        tk.Label(lfOch, text="Peso Heurístico :").grid(row=4, column=0, sticky="e", padx=2, pady=2)
+        ttk.Entry(lfOch, width=10).grid(row=4, column=1, sticky="w", padx=2, pady=2)
+
+        tk.Label(lfOch, text="Peso Feromona :").grid(row=5, column=0, sticky="e", padx=2, pady=2)
+        ttk.Entry(lfOch, width=10).grid(row=5, column=1, sticky="w", padx=2, pady=2)
+
+        # Configuración de Técnicas de Selección
+        lfSeleccion = ttk.LabelFrame(lfAlgoritmo, text="Técnicas de Selección", labelanchor="n")
+        lfSeleccion.pack(fill="x", padx=10, pady=5)
         
-        tk.Label(frame_torneo, text="Torneo").grid(row=0, column=0, columnspan=2, pady=(2,5))
-        tk.Label(frame_torneo, text="% Selección Torneo :").grid(row=1, column=0, sticky="e", padx=5)
-        ent_torneo = ttk.Entry(frame_torneo, width=12)
-        ent_torneo.insert(0, "0.05")
-        ent_torneo.grid(row=1, column=1, sticky="w", padx=5)
-
-        tk.Label(frame_torneo, text="Presión Selectiva :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-        ent_presion = ttk.Entry(frame_torneo, width=12)
-        ent_presion.insert(0, "20")
-        ent_presion.grid(row=2, column=1, sticky="w", padx=5)
-
-        frame_ruleta = tk.Frame(lf_seleccion, bd=1, relief="ridge")
-        frame_ruleta.pack(side="right", fill="both", expand=True, padx=5, pady=5)
+        frameTorneo = tk.Frame(lfSeleccion, bd=1, relief="ridge")
+        frameTorneo.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         
-        tk.Label(frame_ruleta, text="Ruleta").grid(row=0, column=0, columnspan=2)
-        tk.Label(frame_ruleta, text="% Selección Ruleta :").grid(row=1, column=0, sticky="e", padx=5)
-        ent_ruleta = ttk.Entry(frame_ruleta, width=12)
-        ent_ruleta.insert(0, "0.94")
-        ent_ruleta.grid(row=1, column=1, sticky="w", padx=5)
+        tk.Label(frameTorneo, text="Torneo").grid(row=0, column=0, columnspan=2, pady=(2,5))
+        tk.Label(frameTorneo, text="% Selección Torneo :").grid(row=1, column=0, sticky="e", padx=5)
+        entTorneo = ttk.Entry(frameTorneo, width=12)
+        entTorneo.insert(0, "0.05")
+        entTorneo.grid(row=1, column=1, sticky="w", padx=5)
 
-        tk.Label(frame_ruleta, text="Elitsta").grid(row=2, column=0, columnspan=2)
-        tk.Label(frame_ruleta, text="% Selección Elitista :").grid(row=3, column=0, sticky="e", padx=5)
-        ent_elitista = ttk.Entry(frame_ruleta, width=12)
-        ent_elitista.insert(0, "0.01")
-        ent_elitista.grid(row=3, column=1, sticky="w", padx=5, pady=(0,5))
+        tk.Label(frameTorneo, text="Presión Selectiva :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+        entPresion = ttk.Entry(frameTorneo, width=12)
+        entPresion.insert(0, "20")
+        entPresion.grid(row=2, column=1, sticky="w", padx=5)
 
-        # --- Operadores de Cruza y Mutación ---
-        frame_operadores = tk.Frame(lf_algoritmo)
-        frame_operadores.pack(fill="x", padx=5, pady=5)
-
-        # Operador de Cruza
-        lf_cruza = ttk.LabelFrame(frame_operadores, text="Operador de Cruza", labelanchor="n")
-        lf_cruza.pack(side="left", fill="both", expand=True, padx=5)
+        frameRuleta = tk.Frame(lfSeleccion, bd=1, relief="ridge")
+        frameRuleta.pack(side="right", fill="both", expand=True, padx=5, pady=5)
         
-        frame_cruza_in = tk.Frame(lf_cruza)
-        frame_cruza_in.pack(expand=True)
-        tk.Label(frame_cruza_in, text="Puntos Cruza :").grid(row=0, column=0, sticky="e")
-        ent_cruza = ttk.Entry(frame_cruza_in, width=12)
-        ent_cruza.insert(0, "20")
-        ent_cruza.grid(row=0, column=1, sticky="w", padx=5)
+        tk.Label(frameRuleta, text="Ruleta").grid(row=0, column=0, columnspan=2)
+        tk.Label(frameRuleta, text="% Selección Ruleta :").grid(row=1, column=0, sticky="e", padx=5)
+        entRuleta = ttk.Entry(frameRuleta, width=12)
+        entRuleta.insert(0, "0.94")
+        entRuleta.grid(row=1, column=1, sticky="w", padx=5)
 
-        # Operador de Mutacion 
-        lf_mutacion = ttk.LabelFrame(frame_operadores, text="Operador de Mutación", labelanchor="n")
-        lf_mutacion.pack(side="right", fill="both", expand=True, padx=5)
+        tk.Label(frameRuleta, text="Elitista").grid(row=2, column=0, columnspan=2)
+        tk.Label(frameRuleta, text="% Selección Elitista :").grid(row=3, column=0, sticky="e", padx=5)
+        entElitista = ttk.Entry(frameRuleta, width=12)
+        entElitista.insert(0, "0.01")
+        entElitista.grid(row=3, column=1, sticky="w", padx=5, pady=(0,5))
+
+        # Configuración de Operadores de Cruza y Mutación
+        frameOperadores = tk.Frame(lfAlgoritmo)
+        frameOperadores.pack(fill="x", padx=5, pady=5)
+
+        lfCruza = ttk.LabelFrame(frameOperadores, text="Operador de Cruza", labelanchor="n")
+        lfCruza.pack(side="left", fill="both", expand=True, padx=5)
         
-        tk.Label(lf_mutacion, text="Probabilidad :").grid(row=0, column=0, sticky="e", padx=2, pady=(10, 2))
-        ent_prob = ttk.Entry(lf_mutacion, width=12)
-        ent_prob.insert(0, "0.02")
-        ent_prob.grid(row=0, column=1, sticky="w", padx=2, pady=(10, 2))
+        frameCruzaIn = tk.Frame(lfCruza)
+        frameCruzaIn.pack(expand=True)
+        tk.Label(frameCruzaIn, text="Puntos Cruza :").grid(row=0, column=0, sticky="e")
+        entCruza = ttk.Entry(frameCruzaIn, width=12)
+        entCruza.insert(0, "20")
+        entCruza.grid(row=0, column=1, sticky="w", padx=5)
 
-        tk.Label(lf_mutacion, text="Probabilidad Facilitador 1:").grid(row=1, column=0, sticky="e", padx=2, pady=(2, 10))
-        ent_pf1 = ttk.Entry(lf_mutacion, width=12)
-        ent_pf1.insert(0, "0.25")
-        ent_pf1.grid(row=1, column=1, sticky="w", padx=2, pady=(2, 10))
-
-        tk.Label(lf_mutacion, text="Probabilidad Facilitador 2:").grid(row=2, column=0, sticky="e", padx=2, pady=(2, 10))
-        ent_pf2 = ttk.Entry(lf_mutacion, width=12)
-        ent_pf2.insert(0, "0.25")
-        ent_pf2.grid(row=2, column=1, sticky="w", padx=2, pady=(2, 10))
-
-        tk.Label(lf_mutacion, text="Probabilidad Facilitador Complementario:").grid(row=3, column=0, sticky="e", padx=2, pady=(2, 10))
-        ent_pfc = ttk.Entry(lf_mutacion, width=12)
-        ent_pfc.insert(0, "0.25")
-        ent_pfc.grid(row=3, column=1, sticky="w", padx=2, pady=(2, 10))
-
-        tk.Label(lf_mutacion, text="Probabilidad Profesor Ed. Especial:").grid(row=4, column=0, sticky="e", padx=2, pady=(2, 10))
-        ent_pfc = ttk.Entry(lf_mutacion, width=12)
-        ent_pfc.insert(0, "0.25")
-        ent_pfc.grid(row=4, column=1, sticky="w", padx=2, pady=(2, 10))
+        lfMutacion = ttk.LabelFrame(frameOperadores, text="Operador de Mutación", labelanchor="n")
+        lfMutacion.pack(side="right", fill="both", expand=True, padx=5)
         
+        tk.Label(lfMutacion, text="Probabilidad General :").grid(row=0, column=0, sticky="e", padx=2, pady=(10, 2))
+        entProb = ttk.Entry(lfMutacion, width=12)
+        entProb.insert(0, "0.02")
+        entProb.grid(row=0, column=1, sticky="w", padx=2, pady=(10, 2))
 
-        # =========================================================
-        # NUEVO FRAME: DATOS DE LA EJECUCIÓN
-        # =========================================================
-        lf_ejecucion = tk.LabelFrame(frame_der, text=" Datos de la Ejecución ", font=("Arial", 11, "bold"), fg="#333333")
-        lf_ejecucion.pack(fill="both", expand=True, pady=(0, 10), padx=5)
+        tk.Label(lfMutacion, text="Probabilidad Facilitador 1 :").grid(row=1, column=0, sticky="e", padx=2, pady=(2, 10))
+        entPf1 = ttk.Entry(lfMutacion, width=12)
+        entPf1.insert(0, "0.25")
+        entPf1.grid(row=1, column=1, sticky="w", padx=2, pady=(2, 10))
 
-        # Creamos un marco interno invisible para centrar la lista perfectamente
-        frame_datos = tk.Frame(lf_ejecucion)
-        frame_datos.pack(expand=True)
+        tk.Label(lfMutacion, text="Probabilidad Facilitador 2 :").grid(row=2, column=0, sticky="e", padx=2, pady=(2, 10))
+        entPf2 = ttk.Entry(lfMutacion, width=12)
+        entPf2.insert(0, "0.25")
+        entPf2.grid(row=2, column=1, sticky="w", padx=2, pady=(2, 10))
 
-        # Tiempo
-        self.lbl_tiempo = tk.Label(frame_datos, text="Tiempo de ejecución: --", font=("Arial", 15, "bold"), fg="#000000")
-        self.lbl_tiempo.pack(anchor="w", pady=5)
+        tk.Label(lfMutacion, text="Probabilidad Fac. Complementario :").grid(row=3, column=0, sticky="e", padx=2, pady=(2, 10))
+        entPfc = ttk.Entry(lfMutacion, width=12)
+        entPfc.insert(0, "0.25")
+        entPfc.grid(row=3, column=1, sticky="w", padx=2, pady=(2, 10))
 
-        # Generación
-        self.lbl_generacion = tk.Label(frame_datos, text="Número de generación: --", font=("Arial", 15, "bold"), fg="#000000")
-        self.lbl_generacion.pack(anchor="w", pady=5)
+        tk.Label(lfMutacion, text="Probabilidad Prof. Ed. Especial :").grid(row=4, column=0, sticky="e", padx=2, pady=(2, 10))
+        entPfe = ttk.Entry(lfMutacion, width=12)
+        entPfe.insert(0, "0.25")
+        entPfe.grid(row=4, column=1, sticky="w", padx=2, pady=(2, 10))
 
-        # Aptitud
-        self.lbl_aptitud = tk.Label(frame_datos, text="Función de aptitud: --", font=("Arial", 15, "bold"), fg="#000000")
-        self.lbl_aptitud.pack(anchor="w", pady=5)
+        # Panel de visualización de métricas de ejecución
+        lfEjecucion = tk.LabelFrame(frameDer, text=" Datos de la Ejecución ", font=("Arial", 11, "bold"), fg="#333333")
+        lfEjecucion.pack(fill="both", expand=True, pady=(0, 10), padx=5)
 
+        # Contenedor para el centrado de los indicadores
+        frameDatos = tk.Frame(lfEjecucion)
+        frameDatos.pack(expand=True)
 
-        # --- BOTONES DE ACCIÓN ---
-        frame_botones = tk.Frame(frame_der)
-        frame_botones.pack(side="bottom", fill="x", pady=5)
+        self.lblTiempo = tk.Label(frameDatos, text="Tiempo de ejecución: --", font=("Arial", 15, "bold"), fg="#000000")
+        self.lblTiempo.pack(anchor="w", pady=5)
 
-        btn_ejecutar = tk.Button(frame_botones, text="Ejecutar Algoritmo", bg="#4CAF50", fg="white", font=("Arial", 10, "bold"),
-                                 command=lambda: print("Próximamente: Ejecutar algoritmo..."))
-        btn_ejecutar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
+        self.lblGeneracion = tk.Label(frameDatos, text="Número de generación: --", font=("Arial", 15, "bold"), fg="#000000")
+        self.lblGeneracion.pack(anchor="w", pady=5)
 
-        btn_exportar = tk.Button(frame_botones, text="Exportar Horarios", bg="#2196F3", fg="white", font=("Arial", 10, "bold"),
-                                 command=lambda: print("Próximamente: Exportando..."))
-        btn_exportar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
+        self.lblAptitud = tk.Label(frameDatos, text="Función de aptitud: --", font=("Arial", 15, "bold"), fg="#000000")
+        self.lblAptitud.pack(anchor="w", pady=5)
 
-        btn_cancelar = tk.Button(frame_botones, text="Cancelar", bg="#f44336", fg="white", font=("Arial", 10, "bold"),
-                                 command=self.volver_a_carga)
-        btn_cancelar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
+        # Controles de acción principales
+        frameBotones = tk.Frame(frameDer)
+        frameBotones.pack(side="bottom", fill="x", pady=5)
 
-    def volver_a_carga(self):
-        # Regresar a la pantalla de carga
-        self.controlador.mostrar_pantalla(PantallaCarga)
+        btnEjecutar = tk.Button(frameBotones, text="Ejecutar Algoritmo", bg="#4CAF50", fg="white", font=("Arial", 10, "bold"),
+                                command=lambda: print("Sistema: Inicializando ejecución del algoritmo..."))
+        btnEjecutar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
+
+        btnExportar = tk.Button(frameBotones, text="Exportar Horarios", bg="#2196F3", fg="white", font=("Arial", 10, "bold"),
+                                command=lambda: print("Sistema: Exportando resultados..."))
+        btnExportar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
+
+        btnCancelar = tk.Button(frameBotones, text="Cancelar", bg="#f44336", fg="white", font=("Arial", 10, "bold"),
+                                command=self.volverACarga)
+        btnCancelar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
+
+    def volverACarga(self):
+        """
+        Finaliza el proceso actual y retorna a la vista de gestión de datos.
+        """
+        self.controlador.mostrarPantalla(PantallaCarga)
