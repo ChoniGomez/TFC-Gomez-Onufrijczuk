@@ -1,133 +1,150 @@
 import random
-from clases import Hormiga, Cromosoma, Gen, Poblacion
-from restricciones import FR3, FR4, FR5, FR6, FR7
+from clases import Hormiga, Cromosoma, Gen
+from restricciones import FR1, FR2, FR3, FR4, FR5, FR6, FR7, FR8
 
-class OCH:
+def algoritmoOCH(och, gestorDatos):
     """
-    Clase que encapsula la lógica del Algoritmo de Optimización de Colonia de Hormigas.
-    Se encarga de inicializar el entorno y generar la población inicial factible 
-    para el posterior Algoritmo Genético.
+    Inicializa la Matriz de Feromonas global dentro del objeto OCH.
+    Recibe la instancia de OCH (ya configurada con sus parámetros) y el GestorDatos.
     """
-    def __init__(self, gestorDatos):
-        self.gestorDatos = gestorDatos
+    # Si el diccionario de feromonas no está inicializado, se lo crea
+    if not isinstance(och.feromonaGlobal, dict):
+        och.feromonaGlobal = {}
         
-        # Matriz de Feromonas Global: Diccionario con clave (idClase, idFacilitador)
-        self.matrizFeromonas = {}
-        
-        # Parámetros del algoritmo
-        self.cantidadHormigas = 0
-        self.grupoHormigas = 0
-        self.tasaEvaporacion = 0.0
-        self.feromonaInicial = 0.0
-        self.pesoHeuristica = 0.0
-        self.pesoFeromona = 0.0
-        self.premioFeromona = 0.0  # El premio que dejará la hormiga campeona
+    for clase in gestorDatos.listaClases:
+        for facilitador in gestorDatos.listaFacilitadores:
+            och.feromonaGlobal[(clase.idClase, facilitador.idFacilitador)] = och.feromonaInicial
 
-    def algoritmoOCH(self, cantidadHormigas, grupoHormigas, tasaEvaporacion, 
-                     feromonaInicial, pesoHeuristica, pesoFeromona, premioFeromona):
-        """
-        Sin retorno. Recibe los parámetros de inicialización del algoritmo de 
-        colonia de hormigas y configura la Matriz de Feromonas global.
-        """
-        self.cantidadHormigas = int(cantidadHormigas)
-        self.grupoHormigas = int(grupoHormigas)
-        self.tasaEvaporacion = float(tasaEvaporacion)
-        self.feromonaInicial = float(feromonaInicial)
-        self.pesoHeuristica = float(pesoHeuristica)
-        self.pesoFeromona = float(pesoFeromona)
-        self.premioFeromona = float(premioFeromona)
+def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
+    """
+    Función de soporte: Aplica el filtro heurístico (FR1, FR2, FR8) y la ruleta estocástica.
+    """
+    candidatos = gestorDatos.listaFacilitadores
+    atractivos = {}
+    sumaAtractivos = 0.0
+    esPee = (rol == "PEE")
+    
+    for facilitador in candidatos:
+        idCandidato = facilitador.idFacilitador
+        tipoCandidato = facilitador.tipoFacilitador.idTipo
         
-        # Inicialización de la Matriz de Feromonas (Todas las celdas arrancan en feromonaInicial)
-        for clase in self.gestorDatos.listaClases:
-            for facilitador in self.gestorDatos.listaFacilitadores:
-                self.matrizFeromonas[(clase.idClase, facilitador.idFacilitador)] = self.feromonaInicial
-                
-        print(f"Sistema: OCH Inicializado con {self.cantidadHormigas} hormigas en {self.grupoHormigas} grupos.")
+        # Filtro lógico de roles para Educación Especial
+        if esPee and tipoCandidato != 4:
+            continue
+        if not esPee and tipoCandidato == 4:
+            continue
 
-    def generarPoblacionInicial(self):
-        """
-        Retorna: Lista de individuos (Cromosomas).
-        Ejecuta el ciclo de vida de las hormigas en grupos, aplicando heurísticas 
-        (FR1, FR2, FR8), selección por ruleta, evaporación y depósito elitista.
-        """
-        poblacionTotal = []
+        # Disfraz temporal para evaluar restricciones duras
+        if rol == "F1": genActual.idFacilitador1 = idCandidato
+        elif rol == "F2": genActual.idFacilitador2 = idCandidato
+        elif rol == "FC": genActual.idFacilitadorComplementario = idCandidato
+        elif rol == "PEE": genActual.idProfesorEducacionEspecial = idCandidato
         
-        # Cálculo de cuántas hormigas van por cada grupo (ej. 40 / 2 = 20)
-        hormigasPorGrupo = self.cantidadHormigas // self.grupoHormigas
-        idHormigaGlobal = 1
+        conflictos = (FR1(cromosomaActual, gestorDatos) + 
+                      FR2(cromosomaActual, gestorDatos) + 
+                      FR8(cromosomaActual, gestorDatos))
         
-        for numGrupo in range(self.grupoHormigas):
-            poblacionDelGrupo = []
-            
-            # =========================================================
-            # FASE 1: CONSTRUCCIÓN (Las hormigas arman sus planillas)
-            # =========================================================
-            for _ in range(hormigasPorGrupo):
-                # Instanciamos la hormiga y su cromosoma vacío
-                hormiga = Hormiga(idHormiga=idHormigaGlobal, algoritmoOCH=self, poblacion=None)
-                cromosomaActual = Cromosoma(idCromosoma=idHormigaGlobal, funcionAptitud=0.0, ordenCromosoma=idHormigaGlobal, poblacion=None)
-                
-                # La hormiga recorre clase por clase
-                for clase in self.gestorDatos.listaClases:
-                    genNuevo = Gen(idGen=clase.idClase, idFacilitador1=None, idFacilitador2=None, 
-                                   idFacilitadorComplementario=None, idProfesorEducacionEspecial=None, 
-                                   evaluar=True, cromosoma=cromosomaActual)
-                    
-                    # ---------------------------------------------------------
-                    # ACA VA LA LÓGICA DE LA RULETA Y EL FILTRO (FR1, FR2, FR8)
-                    # Para elegir qué ID asignar a genNuevo.idFacilitador1, etc.
-                    # ---------------------------------------------------------
-                    
-                    cromosomaActual.agregarGen(genNuevo)
-                
-                poblacionDelGrupo.append(cromosomaActual)
-                idHormigaGlobal += 1
-                
-            # =========================================================
-            # FASE 2: EVALUACIÓN PARA BUSCAR A LA CAMPEONA DEL GRUPO
-            # =========================================================
-            mejorCromosoma = None
-            menorConflictos = float('inf')
-            
-            for cromosoma in poblacionDelGrupo:
-                # Se evalúan las restricciones blandas de calidad (las duras ya dieron 0 en la construcción)
-                conflictosCalidad = (FR3(cromosoma, self.gestorDatos) + 
-                                     FR4(cromosoma, self.gestorDatos) + 
-                                     FR5(cromosoma, self.gestorDatos) + 
-                                     FR6(cromosoma, self.gestorDatos) + 
-                                     FR7(cromosoma, self.gestorDatos))
-                
-                # Actualizamos quién es la campeona temporal de este lote
-                if conflictosCalidad < menorConflictos:
-                    menorConflictos = conflictosCalidad
-                    mejorCromosoma = cromosoma
-            
-            # =========================================================
-            # FASE 3: EVAPORACIÓN GLOBAL DE LA MATRIZ
-            # =========================================================
-            for clave in self.matrizFeromonas:
-                # Fórmula: Feromona = Feromona * (1 - TasaEvaporacion)
-                self.matrizFeromonas[clave] *= (1.0 - self.tasaEvaporacion)
-                
-            # =========================================================
-            # FASE 4: DEPÓSITO DE FEROMONAS (PREMIO ELITISTA)
-            # =========================================================
-            if mejorCromosoma is not None:
-                for gen in mejorCromosoma.genes:
-                    idClase = gen.idGen # Como mapeamos idGen = idClase en la creación
-                    
-                    # Le damos el premio a los facilitadores que la campeona eligió
-                    if gen.idFacilitador1:
-                        self.matrizFeromonas[(idClase, gen.idFacilitador1)] += self.premioFeromona
-                    if gen.idFacilitador2:
-                        self.matrizFeromonas[(idClase, gen.idFacilitador2)] += self.premioFeromona
-                    if gen.idFacilitadorComplementario:
-                        self.matrizFeromonas[(idClase, gen.idFacilitadorComplementario)] += self.premioFeromona
-                    if gen.idProfesorEducacionEspecial:
-                        self.matrizFeromonas[(idClase, gen.idProfesorEducacionEspecial)] += self.premioFeromona
+        # Limpiamos el disfraz
+        if rol == "F1": genActual.idFacilitador1 = None
+        elif rol == "F2": genActual.idFacilitador2 = None
+        elif rol == "FC": genActual.idFacilitadorComplementario = None
+        elif rol == "PEE": genActual.idProfesorEducacionEspecial = None
+        
+        eta = 1.0 if conflictos == 0 else 0.0
+        tau = och.feromonaGlobal.get((clase.idClase, idCandidato), och.feromonaInicial)
+        
+        atractivo = (tau ** och.importanciaFeromona) * (eta ** och.importanciaHeuristica)
+        
+        if atractivo > 0:
+            atractivos[idCandidato] = atractivo
+            sumaAtractivos += atractivo
 
-            # Guardamos las planillas de este grupo en el listado total
-            poblacionTotal.extend(poblacionDelGrupo)
+    # Callejón sin salida: si ningún facilitador es válido, elige uno al azar del perfil correcto
+    # Esto ya seria un caso extremo de evaporacion
+    if sumaAtractivos == 0.0:
+        validos = [f for f in candidatos if (f.tipoFacilitador.idTipo == 4) == esPee]
+        if validos:
+            return random.choice(validos).idFacilitador
+        return None
+
+    # Selección estocástica
+    r = random.uniform(0.0, 1.0) * sumaAtractivos
+    intervaloAcumulado = 0.0
+    for idCandidato, valorAtractivo in atractivos.items():
+        intervaloAcumulado += valorAtractivo
+        if r <= intervaloAcumulado:
+            return idCandidato
             
-        print(f"Sistema: Se generaron {len(poblacionTotal)} planillas iniciales.")
-        return poblacionTotal
+    return list(atractivos.keys())[-1]
+
+def generarPoblacionInicial(och, gestorDatos):
+    """
+    Ejecuta el ciclo de las hormigas en grupos y retorna la lista de Cromosomas factibles.
+    """
+    poblacionTotal = []
+    
+    # Manejo de seguridad por si grupoHormigas es 0 o nulo
+    grupos = och.grupoHormigas if och.grupoHormigas > 0 else 1
+    hormigasPorGrupo = och.numeroHormigas // grupos
+    
+    idHormigaGlobal = 1
+    
+    for numGrupo in range(grupos):
+        poblacionDelGrupo = []
+        
+        # FASE 1: CONSTRUCCIÓN
+        for _ in range(hormigasPorGrupo):
+            hormiga = Hormiga(idHormiga=idHormigaGlobal, algoritmoOCH=och, poblacion=None)
+            cromosomaActual = Cromosoma(idCromosoma=idHormigaGlobal, funcionAptitud=0.0, ordenCromosoma=idHormigaGlobal, poblacion=None)
+            
+            for clase in gestorDatos.listaClases:
+                genNuevo = Gen(idGen=clase.idClase, idFacilitador1=None, idFacilitador2=None, 
+                               idFacilitadorComplementario=None, idProfesorEducacionEspecial=None, 
+                               evaluar=True, cromosoma=cromosomaActual)
+                
+                # Añadimos el gen vacío PRIMERO para que las restricciones evalúen el contexto
+                cromosomaActual.agregarGen(genNuevo)
+                
+                # Asignación guiada por Ruleta y Restricciones Duras
+                genNuevo.idFacilitador1 = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "F1")
+                genNuevo.idFacilitador2 = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "F2")
+                genNuevo.idFacilitadorComplementario = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "FC")
+                
+                # Si la clase requiere Profesor de Educación Especial (TC = 3 o 4)
+                if clase.tipoDeClase == 3 or clase.tipoDeClase == 4:
+                    genNuevo.idProfesorEducacionEspecial = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "PEE")
+            
+            poblacionDelGrupo.append(cromosomaActual)
+            idHormigaGlobal += 1
+            
+        # FASE 2: EVALUACIÓN PARA BUSCAR A LA CAMPEONA DEL GRUPO
+        mejorCromosoma = None
+        menorConflictos = float('inf')
+        
+        for cromosoma in poblacionDelGrupo:
+            conflictosCalidad = (FR3(cromosoma, gestorDatos) + 
+                                 FR4(cromosoma, gestorDatos) + 
+                                 FR5(cromosoma, gestorDatos) + 
+                                 FR6(cromosoma, gestorDatos) + 
+                                 FR7(cromosoma, gestorDatos))
+            
+            if conflictosCalidad < menorConflictos:
+                menorConflictos = conflictosCalidad
+                mejorCromosoma = cromosoma
+        
+        # FASE 3: EVAPORACIÓN GLOBAL
+        for clave in och.feromonaGlobal:
+            och.feromonaGlobal[clave] *= (1.0 - och.evaporacionFeromona)
+            
+        # FASE 4: DEPÓSITO DE FEROMONAS (PREMIO ELITISTA)
+        if mejorCromosoma is not None:
+            for gen in mejorCromosoma.genes:
+                idClase = gen.idGen
+                if gen.idFacilitador1: och.feromonaGlobal[(idClase, gen.idFacilitador1)] += och.premioFeromona
+                if gen.idFacilitador2: och.feromonaGlobal[(idClase, gen.idFacilitador2)] += och.premioFeromona
+                if gen.idFacilitadorComplementario: och.feromonaGlobal[(idClase, gen.idFacilitadorComplementario)] += och.premioFeromona
+                if gen.idProfesorEducacionEspecial: och.feromonaGlobal[(idClase, gen.idProfesorEducacionEspecial)] += och.premioFeromona
+
+        poblacionTotal.extend(poblacionDelGrupo)
+        
+    return poblacionTotal

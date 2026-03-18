@@ -125,24 +125,30 @@ class OCH:
     de Colonia de Hormigas (OCH) para la asignación de clases.
     """
     def __init__(self, idOCH, numeroHormigas, feromonaInicial, evaporacionFeromona, 
-                 feromonaGlobal, importanciaHeuristica, importanciaFeromona):
+                 feromonaGlobal, importanciaHeuristica, importanciaFeromona, 
+                 grupoHormigas=1, premioFeromona=0.0):
         
         self.idOCH = int(idOCH)
         self.numeroHormigas = int(numeroHormigas)
+        
+        # Nuevos parámetros para la arquitectura por lotes (Batches) y Elitismo
+        self.grupoHormigas = int(grupoHormigas)
         
         # Conversión estricta de tipos de datos (float representa double en Python de 64 bits).
         self.feromonaInicial = float(feromonaInicial)
         self.evaporacionFeromona = float(evaporacionFeromona)
         self.importanciaHeuristica = float(importanciaHeuristica)
         self.importanciaFeromona = float(importanciaFeromona)
+        self.premioFeromona = float(premioFeromona)
         
         # Matriz de tipo double que representa el rastro de feromonas del sistema.
-        self.feromonaGlobal = feromonaGlobal
+        # En la implementación se utiliza un diccionario con clave tupla (idClase, idFacilitador)
+        self.feromonaGlobal = feromonaGlobal if feromonaGlobal is not None else {}
 
     def __repr__(self):
         return (f"<OCH idOCH: {self.idOCH} | numeroHormigas: {self.numeroHormigas} | "
                 f"evaporacionFeromona: {self.evaporacionFeromona}>")
-    
+     
 class Gen:
     """
     Representa la unidad mínima de información genética del algoritmo.

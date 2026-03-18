@@ -15,7 +15,7 @@ class AppPrincipal(tk.Tk):
         # Configuración de dimensiones y centrado de ventana
         # ---------------------------------------------------------
         anchoVentana = 1100
-        altoVentana = 750
+        altoVentana = 790
 
         # Obtención de la resolución total de la pantalla del usuario
         anchoPantalla = self.winfo_screenwidth()

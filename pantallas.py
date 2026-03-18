@@ -195,11 +195,14 @@ class PantallaAlgoritmo(tk.Frame):
         tk.Label(lfOch, text="Tasa Evaporación Feromona :").grid(row=3, column=0, sticky="e", padx=2, pady=2)
         ttk.Entry(lfOch, width=10).grid(row=3, column=1, sticky="w", padx=2, pady=2)
 
-        tk.Label(lfOch, text="Peso Heurístico :").grid(row=4, column=0, sticky="e", padx=2, pady=2)
+        tk.Label(lfOch, text="Depósito de Feromona :").grid(row=4, column=0, sticky="e", padx=2, pady=2)
         ttk.Entry(lfOch, width=10).grid(row=4, column=1, sticky="w", padx=2, pady=2)
 
-        tk.Label(lfOch, text="Peso Feromona :").grid(row=5, column=0, sticky="e", padx=2, pady=2)
+        tk.Label(lfOch, text="Peso Heurístico :").grid(row=5, column=0, sticky="e", padx=2, pady=2)
         ttk.Entry(lfOch, width=10).grid(row=5, column=1, sticky="w", padx=2, pady=2)
+
+        tk.Label(lfOch, text="Peso Feromona :").grid(row=6, column=0, sticky="e", padx=2, pady=2)
+        ttk.Entry(lfOch, width=10).grid(row=6, column=1, sticky="w", padx=2, pady=2)
 
         # Configuración de Técnicas de Selección
         lfSeleccion = ttk.LabelFrame(lfAlgoritmo, text="Técnicas de Selección", labelanchor="n")
