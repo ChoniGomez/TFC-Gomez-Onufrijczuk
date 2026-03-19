@@ -17,40 +17,75 @@ def algoritmoOCH(och, gestorDatos):
 
 def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
     """
-    Función de soporte: Aplica el filtro heurístico (FR1, FR2, FR8) y la ruleta estocástica.
+    Función de soporte: Aplica un filtro heurístico rápido (FR1, FR2, FR8) 
+    verificando propiedades directas en lugar de evaluar todo el cromosoma, 
+    evitando la explosión combinatoria.
     """
     candidatos = gestorDatos.listaFacilitadores
     atractivos = {}
     sumaAtractivos = 0.0
     esPee = (rol == "PEE")
     
+    # Pre-calculamos los datos de la clase actual para no repetir código
+    diaClase = clase.horarioDeClase.dia
+    modulosClaseActual = set(m.idModuloDeHorario for m in clase.horarioDeClase.modulos)
+    
     for facilitador in candidatos:
         idCandidato = facilitador.idFacilitador
         tipoCandidato = facilitador.tipoFacilitador.idTipo
         
-        # Filtro lógico de roles para Educación Especial
-        if esPee and tipoCandidato != 4:
-            continue
-        if not esPee and tipoCandidato == 4:
-            continue
+        # 1. Filtro lógico de roles
+        if esPee and tipoCandidato != 4: continue
+        if not esPee and tipoCandidato == 4: continue
 
-        # Disfraz temporal para evaluar restricciones duras
-        if rol == "F1": genActual.idFacilitador1 = idCandidato
-        elif rol == "F2": genActual.idFacilitador2 = idCandidato
-        elif rol == "FC": genActual.idFacilitadorComplementario = idCandidato
-        elif rol == "PEE": genActual.idProfesorEducacionEspecial = idCandidato
+        # =========================================================
+        # EVALUACIÓN RÁPIDA (Reemplaza a las FR pesadas)
+        # =========================================================
         
-        conflictos = (FR1(cromosomaActual, gestorDatos) + 
-                      FR2(cromosomaActual, gestorDatos) + 
-                      FR8(cromosomaActual, gestorDatos))
+        # FAST FR8: ¿Tiene la competencia para este trayecto?
+        esCompetente = False
+        if facilitador.disponibilidadTrayecto:
+            for t in facilitador.disponibilidadTrayecto.trayectos:
+                if t.idTrayecto == clase.trayecto.idTrayecto:
+                    esCompetente = True
+                    break
+        if not esCompetente: continue # Falla la competencia, descartar
         
-        # Limpiamos el disfraz
-        if rol == "F1": genActual.idFacilitador1 = None
-        elif rol == "F2": genActual.idFacilitador2 = None
-        elif rol == "FC": genActual.idFacilitadorComplementario = None
-        elif rol == "PEE": genActual.idProfesorEducacionEspecial = None
+        # FAST FR2: ¿Tiene disponibilidad horaria contractual hoy?
+        estaDisponible = False
+        for disp in facilitador.disponibilidadesHorarias:
+            if disp.dia == diaClase:
+                modulosProfe = set(m.idModuloDeHorario for m in disp.modulos)
+                # Verificamos si los módulos de la clase están dentro de los módulos del profe
+                if modulosClaseActual.issubset(modulosProfe):
+                    estaDisponible = True
+                    break
+        if not estaDisponible: continue # Falla la disponibilidad, descartar
         
-        eta = 1.0 if conflictos == 0 else 0.0
+        # FAST FR1: ¿Ya está asignado a otra clase que se solapa ahora mismo?
+        tieneChoque = False
+        for genAnterior in cromosomaActual.genes:
+            # Ignoramos el gen que estamos construyendo ahora
+            if genAnterior.idGen == clase.idClase: continue 
+            
+            # Si el profe ya está asignado a esa clase anterior...
+            if idCandidato in [genAnterior.idFacilitador1, genAnterior.idFacilitador2, 
+                               genAnterior.idFacilitadorComplementario, genAnterior.idProfesorEducacionEspecial]:
+                
+                # Buscamos los datos de esa clase anterior
+                claseAnterior = next((c for c in gestorDatos.listaClases if c.idClase == genAnterior.idGen), None)
+                if claseAnterior and claseAnterior.horarioDeClase.dia == diaClase:
+                    modulosAnteriores = set(m.idModuloDeHorario for m in claseAnterior.horarioDeClase.modulos)
+                    # Si hay intersección de módulos, significa que chocan los horarios
+                    if modulosClaseActual.intersection(modulosAnteriores):
+                        tieneChoque = True
+                        break
+        if tieneChoque: continue # Falla por choque de horario, descartar
+
+        # =========================================================
+        # CÁLCULO DE PROBABILIDAD (Si llegó hasta acá, es apto)
+        # =========================================================
+        eta = 1.0 
         tau = och.feromonaGlobal.get((clase.idClase, idCandidato), och.feromonaInicial)
         
         atractivo = (tau ** och.importanciaFeromona) * (eta ** och.importanciaHeuristica)
@@ -59,15 +94,14 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
             atractivos[idCandidato] = atractivo
             sumaAtractivos += atractivo
 
-    # Callejón sin salida: si ningún facilitador es válido, elige uno al azar del perfil correcto
-    # Esto ya seria un caso extremo de evaporacion
+    # Callejón sin salida (Si todos fallaron los filtros)
     if sumaAtractivos == 0.0:
         validos = [f for f in candidatos if (f.tipoFacilitador.idTipo == 4) == esPee]
         if validos:
             return random.choice(validos).idFacilitador
         return None
 
-    # Selección estocástica
+    # Selección estocástica (Ruleta)
     r = random.uniform(0.0, 1.0) * sumaAtractivos
     intervaloAcumulado = 0.0
     for idCandidato, valorAtractivo in atractivos.items():
@@ -85,7 +119,9 @@ def generarPoblacionInicial(och, gestorDatos):
     
     # Manejo de seguridad por si grupoHormigas es 0 o nulo
     grupos = och.grupoHormigas if och.grupoHormigas > 0 else 1
-    hormigasPorGrupo = och.numeroHormigas // grupos
+    
+    # La cantidad ingresada es igual la cantidad por cada grupo
+    hormigasPorGrupo = och.numeroHormigas
     
     idHormigaGlobal = 1
     

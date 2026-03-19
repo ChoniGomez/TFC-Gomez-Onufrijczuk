@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from clases import OCH
+from algoritmo import algoritmoOCH, generarPoblacionInicial
 
 class PantallaInicio(tk.Frame):
     """
@@ -155,28 +157,34 @@ class PantallaAlgoritmo(tk.Frame):
         frameTopDer = tk.Frame(lfAlgoritmo)
         frameTopDer.pack(fill="x", pady=5, padx=5)
 
+        # =========================================================
         # Configuración de criterios de finalización
+        # =========================================================
         lfFin = ttk.LabelFrame(frameTopDer, text="Condición de Fin")
         lfFin.pack(side="left", fill="both", expand=True, padx=5)
         
         lfFin.columnconfigure(0, weight=1)
         lfFin.columnconfigure(1, weight=1)
         
-        # Asignación de peso dinámico a las filas para distribución vertical equitativa
         lfFin.rowconfigure(0, weight=1)
         lfFin.rowconfigure(1, weight=1)
         lfFin.rowconfigure(2, weight=1)
 
         tk.Label(lfFin, text="Número de Generaciones :").grid(row=0, column=0, sticky="e", padx=2, pady=15)
-        ttk.Entry(lfFin, width=10).grid(row=0, column=1, sticky="w", padx=2, pady=15)
+        self.entGeneraciones = ttk.Entry(lfFin, width=10)
+        self.entGeneraciones.grid(row=0, column=1, sticky="w", padx=2, pady=15)
         
         tk.Label(lfFin, text="Soluciones Deseadas :").grid(row=1, column=0, sticky="e", padx=2, pady=15)
-        ttk.Entry(lfFin, width=10).grid(row=1, column=1, sticky="w", padx=2, pady=15)
+        self.entSoluciones = ttk.Entry(lfFin, width=10)
+        self.entSoluciones.grid(row=1, column=1, sticky="w", padx=2, pady=15)
         
         tk.Label(lfFin, text="Minutos de Ejecución :").grid(row=2, column=0, sticky="e", padx=2, pady=15)
-        ttk.Entry(lfFin, width=10).grid(row=2, column=1, sticky="w", padx=2, pady=15)
+        self.entMinutos = ttk.Entry(lfFin, width=10)
+        self.entMinutos.grid(row=2, column=1, sticky="w", padx=2, pady=15)
 
+        # =========================================================
         # Parámetros del Algoritmo de Colonia de Hormigas (OCH)
+        # =========================================================
         lfOch = ttk.LabelFrame(frameTopDer, text="Optimización Colonia de Hormigas")
         lfOch.pack(side="right", fill="both", expand=True, padx=5)
 
@@ -184,27 +192,36 @@ class PantallaAlgoritmo(tk.Frame):
         lfOch.columnconfigure(1, weight=1)
 
         tk.Label(lfOch, text="Número de Hormigas :").grid(row=0, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lfOch, width=10).grid(row=0, column=1, sticky="w", padx=2, pady=2)
+        self.entNumHormigas = ttk.Entry(lfOch, width=10)
+        self.entNumHormigas.grid(row=0, column=1, sticky="w", padx=2, pady=2)
 
         tk.Label(lfOch, text="Grupo de Hormigas :").grid(row=1, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lfOch, width=10).grid(row=1, column=1, sticky="w", padx=2, pady=2)
+        self.entGrupoHormigas = ttk.Entry(lfOch, width=10)
+        self.entGrupoHormigas.grid(row=1, column=1, sticky="w", padx=2, pady=2)
         
         tk.Label(lfOch, text="Feromona Inicial :").grid(row=2, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lfOch, width=10).grid(row=2, column=1, sticky="w", padx=2, pady=2)
+        self.entFeromonaInicial = ttk.Entry(lfOch, width=10)
+        self.entFeromonaInicial.grid(row=2, column=1, sticky="w", padx=2, pady=2)
         
         tk.Label(lfOch, text="Tasa Evaporación Feromona :").grid(row=3, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lfOch, width=10).grid(row=3, column=1, sticky="w", padx=2, pady=2)
+        self.entEvaporacion = ttk.Entry(lfOch, width=10)
+        self.entEvaporacion.grid(row=3, column=1, sticky="w", padx=2, pady=2)
 
         tk.Label(lfOch, text="Depósito de Feromona :").grid(row=4, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lfOch, width=10).grid(row=4, column=1, sticky="w", padx=2, pady=2)
+        self.entDepositoFero = ttk.Entry(lfOch, width=10)
+        self.entDepositoFero.grid(row=4, column=1, sticky="w", padx=2, pady=2)
 
         tk.Label(lfOch, text="Peso Heurístico :").grid(row=5, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lfOch, width=10).grid(row=5, column=1, sticky="w", padx=2, pady=2)
+        self.entPesoHeuristico = ttk.Entry(lfOch, width=10)
+        self.entPesoHeuristico.grid(row=5, column=1, sticky="w", padx=2, pady=2)
 
         tk.Label(lfOch, text="Peso Feromona :").grid(row=6, column=0, sticky="e", padx=2, pady=2)
-        ttk.Entry(lfOch, width=10).grid(row=6, column=1, sticky="w", padx=2, pady=2)
+        self.entPesoFeromona = ttk.Entry(lfOch, width=10)
+        self.entPesoFeromona.grid(row=6, column=1, sticky="w", padx=2, pady=2)
 
+        # =========================================================
         # Configuración de Técnicas de Selección
+        # =========================================================
         lfSeleccion = ttk.LabelFrame(lfAlgoritmo, text="Técnicas de Selección", labelanchor="n")
         lfSeleccion.pack(fill="x", padx=10, pady=5)
         
@@ -213,31 +230,33 @@ class PantallaAlgoritmo(tk.Frame):
         
         tk.Label(frameTorneo, text="Torneo").grid(row=0, column=0, columnspan=2, pady=(2,5))
         tk.Label(frameTorneo, text="% Selección Torneo :").grid(row=1, column=0, sticky="e", padx=5)
-        entTorneo = ttk.Entry(frameTorneo, width=12)
-        entTorneo.insert(0, "0.05")
-        entTorneo.grid(row=1, column=1, sticky="w", padx=5)
+        self.entTorneo = ttk.Entry(frameTorneo, width=12)
+        self.entTorneo.insert(0, "0.05")
+        self.entTorneo.grid(row=1, column=1, sticky="w", padx=5)
 
         tk.Label(frameTorneo, text="Presión Selectiva :").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-        entPresion = ttk.Entry(frameTorneo, width=12)
-        entPresion.insert(0, "20")
-        entPresion.grid(row=2, column=1, sticky="w", padx=5)
+        self.entPresion = ttk.Entry(frameTorneo, width=12)
+        self.entPresion.insert(0, "20")
+        self.entPresion.grid(row=2, column=1, sticky="w", padx=5)
 
         frameRuleta = tk.Frame(lfSeleccion, bd=1, relief="ridge")
         frameRuleta.pack(side="right", fill="both", expand=True, padx=5, pady=5)
         
         tk.Label(frameRuleta, text="Ruleta").grid(row=0, column=0, columnspan=2)
         tk.Label(frameRuleta, text="% Selección Ruleta :").grid(row=1, column=0, sticky="e", padx=5)
-        entRuleta = ttk.Entry(frameRuleta, width=12)
-        entRuleta.insert(0, "0.94")
-        entRuleta.grid(row=1, column=1, sticky="w", padx=5)
+        self.entRuleta = ttk.Entry(frameRuleta, width=12)
+        self.entRuleta.insert(0, "0.94")
+        self.entRuleta.grid(row=1, column=1, sticky="w", padx=5)
 
         tk.Label(frameRuleta, text="Elitista").grid(row=2, column=0, columnspan=2)
         tk.Label(frameRuleta, text="% Selección Elitista :").grid(row=3, column=0, sticky="e", padx=5)
-        entElitista = ttk.Entry(frameRuleta, width=12)
-        entElitista.insert(0, "0.01")
-        entElitista.grid(row=3, column=1, sticky="w", padx=5, pady=(0,5))
+        self.entElitista = ttk.Entry(frameRuleta, width=12)
+        self.entElitista.insert(0, "0.01")
+        self.entElitista.grid(row=3, column=1, sticky="w", padx=5, pady=(0,5))
 
+        # =========================================================
         # Configuración de Operadores de Cruza y Mutación
+        # =========================================================
         frameOperadores = tk.Frame(lfAlgoritmo)
         frameOperadores.pack(fill="x", padx=5, pady=5)
 
@@ -247,39 +266,41 @@ class PantallaAlgoritmo(tk.Frame):
         frameCruzaIn = tk.Frame(lfCruza)
         frameCruzaIn.pack(expand=True)
         tk.Label(frameCruzaIn, text="Puntos Cruza :").grid(row=0, column=0, sticky="e")
-        entCruza = ttk.Entry(frameCruzaIn, width=12)
-        entCruza.insert(0, "20")
-        entCruza.grid(row=0, column=1, sticky="w", padx=5)
+        self.entCruza = ttk.Entry(frameCruzaIn, width=12)
+        self.entCruza.insert(0, "20")
+        self.entCruza.grid(row=0, column=1, sticky="w", padx=5)
 
         lfMutacion = ttk.LabelFrame(frameOperadores, text="Operador de Mutación", labelanchor="n")
         lfMutacion.pack(side="right", fill="both", expand=True, padx=5)
         
         tk.Label(lfMutacion, text="Probabilidad General :").grid(row=0, column=0, sticky="e", padx=2, pady=(10, 2))
-        entProb = ttk.Entry(lfMutacion, width=12)
-        entProb.insert(0, "0.02")
-        entProb.grid(row=0, column=1, sticky="w", padx=2, pady=(10, 2))
+        self.entProb = ttk.Entry(lfMutacion, width=12)
+        self.entProb.insert(0, "0.02")
+        self.entProb.grid(row=0, column=1, sticky="w", padx=2, pady=(10, 2))
 
         tk.Label(lfMutacion, text="Probabilidad Facilitador 1 :").grid(row=1, column=0, sticky="e", padx=2, pady=(2, 10))
-        entPf1 = ttk.Entry(lfMutacion, width=12)
-        entPf1.insert(0, "0.25")
-        entPf1.grid(row=1, column=1, sticky="w", padx=2, pady=(2, 10))
+        self.entPf1 = ttk.Entry(lfMutacion, width=12)
+        self.entPf1.insert(0, "0.25")
+        self.entPf1.grid(row=1, column=1, sticky="w", padx=2, pady=(2, 10))
 
         tk.Label(lfMutacion, text="Probabilidad Facilitador 2 :").grid(row=2, column=0, sticky="e", padx=2, pady=(2, 10))
-        entPf2 = ttk.Entry(lfMutacion, width=12)
-        entPf2.insert(0, "0.25")
-        entPf2.grid(row=2, column=1, sticky="w", padx=2, pady=(2, 10))
+        self.entPf2 = ttk.Entry(lfMutacion, width=12)
+        self.entPf2.insert(0, "0.25")
+        self.entPf2.grid(row=2, column=1, sticky="w", padx=2, pady=(2, 10))
 
         tk.Label(lfMutacion, text="Probabilidad Fac. Complementario :").grid(row=3, column=0, sticky="e", padx=2, pady=(2, 10))
-        entPfc = ttk.Entry(lfMutacion, width=12)
-        entPfc.insert(0, "0.25")
-        entPfc.grid(row=3, column=1, sticky="w", padx=2, pady=(2, 10))
+        self.entPfc = ttk.Entry(lfMutacion, width=12)
+        self.entPfc.insert(0, "0.25")
+        self.entPfc.grid(row=3, column=1, sticky="w", padx=2, pady=(2, 10))
 
         tk.Label(lfMutacion, text="Probabilidad Prof. Ed. Especial :").grid(row=4, column=0, sticky="e", padx=2, pady=(2, 10))
-        entPfe = ttk.Entry(lfMutacion, width=12)
-        entPfe.insert(0, "0.25")
-        entPfe.grid(row=4, column=1, sticky="w", padx=2, pady=(2, 10))
+        self.entPfe = ttk.Entry(lfMutacion, width=12)
+        self.entPfe.insert(0, "0.25")
+        self.entPfe.grid(row=4, column=1, sticky="w", padx=2, pady=(2, 10))
 
+        # =========================================================
         # Panel de visualización de métricas de ejecución
+        # =========================================================
         lfEjecucion = tk.LabelFrame(frameDer, text=" Datos de la Ejecución ", font=("Arial", 11, "bold"), fg="#333333")
         lfEjecucion.pack(fill="both", expand=True, pady=(0, 10), padx=5)
 
@@ -296,12 +317,15 @@ class PantallaAlgoritmo(tk.Frame):
         self.lblAptitud = tk.Label(frameDatos, text="Función de aptitud: --", font=("Arial", 15, "bold"), fg="#000000")
         self.lblAptitud.pack(anchor="w", pady=5)
 
+        # =========================================================
         # Controles de acción principales
+        # =========================================================
         frameBotones = tk.Frame(frameDer)
         frameBotones.pack(side="bottom", fill="x", pady=5)
 
+        # todos los self.ent*.get() para iniciar el algoritmo.
         btnEjecutar = tk.Button(frameBotones, text="Ejecutar Algoritmo", bg="#4CAF50", fg="white", font=("Arial", 10, "bold"),
-                                command=lambda: print("Sistema: Inicializando ejecución del algoritmo..."))
+                                command=self.ejecutarAlgoritmo)
         btnEjecutar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
 
         btnExportar = tk.Button(frameBotones, text="Exportar Horarios", bg="#2196F3", fg="white", font=("Arial", 10, "bold"),
@@ -317,3 +341,50 @@ class PantallaAlgoritmo(tk.Frame):
         Finaliza el proceso actual y retorna a la vista de gestión de datos.
         """
         self.controlador.mostrarPantalla(PantallaCarga)
+
+    def ejecutarAlgoritmo(self):
+        """
+        Captura los parámetros de la interfaz, inicializa el entorno OCH 
+        y genera la población inicial para pruebas.
+        """
+        try:
+            # 1. Capturar parámetros de la Colonia de Hormigas
+            numHormigas = int(self.entNumHormigas.get())
+            grupHormigas = int(self.entGrupoHormigas.get())
+            feroInicial = float(self.entFeromonaInicial.get())
+            tasaEvap = float(self.entEvaporacion.get())
+            depositoFero = float(self.entDepositoFero.get())
+            pesoHeur = float(self.entPesoHeuristico.get())
+            pesoFero = float(self.entPesoFeromona.get())
+            
+            # 2. Instanciar el objeto OCH con la configuración
+            # (Asignamos idOCH=1 genéricamente para esta corrida)
+            configOCH = OCH(
+                idOCH=1, 
+                numeroHormigas=numHormigas, 
+                feromonaInicial=feroInicial, 
+                evaporacionFeromona=tasaEvap, 
+                feromonaGlobal=None, 
+                importanciaHeuristica=pesoHeur, 
+                importanciaFeromona=pesoFero,
+                grupoHormigas=grupHormigas,
+                premioFeromona=depositoFero
+            )
+            
+            # 3. Preparar el entorno global
+            print("Sistema: Inicializando Matriz de Feromonas...")
+            algoritmoOCH(configOCH, self.controlador.gestor)
+            
+            # 4. Soltar a las hormigas
+            print("Sistema: Generando población inicial...")
+            poblacionInicial = generarPoblacionInicial(configOCH, self.controlador.gestor)
+            
+            # 5. Feedback visual de éxito
+            mensaje = f"Se generaron exitosamente {len(poblacionInicial)} planillas de horarios factibles."
+            print(f"Sistema: {mensaje}")
+            messagebox.showinfo("Fase 1 Completada", mensaje)
+            
+        except ValueError:
+            messagebox.showerror("Error de Formato", "Por favor, verifique que todos los campos del OCH contengan valores numéricos válidos.")
+        except Exception as e:
+            messagebox.showerror("Error de Ejecución", f"Ocurrió un error inesperado:\n{str(e)}")
