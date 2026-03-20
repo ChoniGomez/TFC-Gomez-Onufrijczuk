@@ -5,7 +5,17 @@ import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from clases import OCH
-from algoritmo import algoritmoOCH, generarPoblacionInicial
+
+# --- ACTUALIZACIÓN DE IMPORTS ---
+from algoritmo import (algoritmoOCH, generarPoblacionInicial, evaluarFuncionAptitud, 
+                       algoritmoAG, ejecutarCicloGenetico)
+
+# --- NUEVA CLASE PARA EL AG ---
+class ConfiguracionAG:
+    """Clase para empaquetar los parámetros del Algoritmo Genético"""
+    def __init__(self):
+        pass
+
 
 class PantallaInicio(tk.Frame):
     """
@@ -112,6 +122,7 @@ class PantallaAlgoritmo(tk.Frame):
     def crearPanelIzquierdo(self):
         """
         Inicializa y renderiza el panel de gráficos estadísticos de evolución.
+        --- MODIFICADO PARA INICIAR VACÍO ---
         """
         frameIzq = tk.Frame(self, padx=10, pady=10)
         frameIzq.grid(row=0, column=0, sticky="nsew")
@@ -119,28 +130,25 @@ class PantallaAlgoritmo(tk.Frame):
         lfGrafico = ttk.LabelFrame(frameIzq, text="Gráfico de Evolución")
         lfGrafico.pack(fill="both", expand=True, pady=10)
 
-        fig = Figure(figsize=(5, 4), dpi=100)
-        ax = fig.add_subplot(111)
+        # Guardamos la figura, el eje y el canvas en 'self'
+        self.fig = Figure(figsize=(5, 4), dpi=100)
+        self.ax = self.fig.add_subplot(111)
         
-        # Simulación inicial de datos para la vista del gráfico
-        generaciones = np.arange(0, 150)
-        promedio = np.log(generaciones + 1) * 6 + np.random.rand(150) * 2
-        maximo = promedio + np.random.rand(150) * 4 + 2
+        # Gráfico inicial vacío y elegante
+        self.ax.set_title('Evolución de la Población', fontsize=10, fontweight='bold')
+        self.ax.set_xlabel('Generaciones', fontweight='bold')
+        self.ax.set_ylabel('Función de Aptitud', fontweight='bold')
+        self.ax.set_xlim(0, 100)
+        self.ax.set_ylim(0, 1.0)
         
-        ax.fill_between(generaciones, maximo, color='red', label='Máximo')
-        ax.fill_between(generaciones, promedio, color='lime', label='Promedio')
+        self.ax.text(50, 0.5, "Esperando parámetros y ejecución...", 
+                     ha='center', va='center', fontsize=10, alpha=0.5)
         
-        ax.set_title('Evolución de la Población', fontsize=10, fontweight='bold')
-        ax.set_xlabel('Generaciones', fontweight='bold')
-        ax.set_ylabel('Función de Aptitud', fontweight='bold')
-        ax.set_xlim(0, 150)
-        ax.set_ylim(0, max(maximo) + 5)
-        ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25), ncol=2)
-        fig.tight_layout()
+        self.fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, master=lfGrafico)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True, padx=5, pady=5)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=lfGrafico)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=5, pady=5)
 
     def crearPanelDerecho(self):
         """
@@ -323,7 +331,6 @@ class PantallaAlgoritmo(tk.Frame):
         frameBotones = tk.Frame(frameDer)
         frameBotones.pack(side="bottom", fill="x", pady=5)
 
-        # todos los self.ent*.get() para iniciar el algoritmo.
         btnEjecutar = tk.Button(frameBotones, text="Ejecutar Algoritmo", bg="#4CAF50", fg="white", font=("Arial", 10, "bold"),
                                 command=self.ejecutarAlgoritmo)
         btnEjecutar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
@@ -342,49 +349,104 @@ class PantallaAlgoritmo(tk.Frame):
         """
         self.controlador.mostrarPantalla(PantallaCarga)
 
+    # --- MODIFICADO: DIRECTOR DE ORQUESTA COMPLETO ---
     def ejecutarAlgoritmo(self):
         """
-        Captura los parámetros de la interfaz, inicializa el entorno OCH 
-        y genera la población inicial para pruebas.
+        Captura los parámetros de la interfaz, inicializa OCH para la 
+        población inicial, ejecuta el Algoritmo Genético y actualiza la interfaz.
         """
         try:
-            # 1. Capturar parámetros de la Colonia de Hormigas
-            numHormigas = int(self.entNumHormigas.get())
-            grupHormigas = int(self.entGrupoHormigas.get())
-            feroInicial = float(self.entFeromonaInicial.get())
-            tasaEvap = float(self.entEvaporacion.get())
-            depositoFero = float(self.entDepositoFero.get())
-            pesoHeur = float(self.entPesoHeuristico.get())
-            pesoFero = float(self.entPesoFeromona.get())
+            # ==========================================
+            # FASE 1: CAPTURA DE PARÁMETROS
+            # ==========================================
+            print("Sistema: Leyendo parámetros de la interfaz...")
             
-            # 2. Instanciar el objeto OCH con la configuración
-            # (Asignamos idOCH=1 genéricamente para esta corrida)
+            # 1.1 Parámetros OCH
             configOCH = OCH(
                 idOCH=1, 
-                numeroHormigas=numHormigas, 
-                feromonaInicial=feroInicial, 
-                evaporacionFeromona=tasaEvap, 
+                numeroHormigas=int(self.entNumHormigas.get()), 
+                feromonaInicial=float(self.entFeromonaInicial.get()), 
+                evaporacionFeromona=float(self.entEvaporacion.get()), 
                 feromonaGlobal=None, 
-                importanciaHeuristica=pesoHeur, 
-                importanciaFeromona=pesoFero,
-                grupoHormigas=grupHormigas,
-                premioFeromona=depositoFero
+                importanciaHeuristica=float(self.entPesoHeuristico.get()), 
+                importanciaFeromona=float(self.entPesoFeromona.get()),
+                grupoHormigas=int(self.entGrupoHormigas.get()), 
+                premioFeromona=float(self.entDepositoFero.get())
             )
+
+            # 1.2 Parámetros AG
+            configAG = ConfiguracionAG()
+            configAG.numeroGeneraciones = int(self.entGeneraciones.get())
+            configAG.solucionesDeseadas = float(self.entSoluciones.get() if self.entSoluciones.get() else 1.0)
+            configAG.minutosEjecucion = float(self.entMinutos.get())
             
-            # 3. Preparar el entorno global
-            print("Sistema: Inicializando Matriz de Feromonas...")
+            configAG.seleccionTorneo = float(self.entTorneo.get())
+            configAG.seleccionRuleta = float(self.entRuleta.get())
+            configAG.seleccionElitista = float(self.entElitista.get())
+            configAG.probGeneralMutacion = float(self.entProb.get())
+
+            # ==========================================
+            # FASE 2: COLONIA DE HORMIGAS (Población Inicial)
+            # ==========================================
+            print("Sistema: Inicializando Matriz de Feromonas OCH...")
             algoritmoOCH(configOCH, self.controlador.gestor)
             
-            # 4. Soltar a las hormigas
-            print("Sistema: Generando población inicial...")
-            poblacionInicial = generarPoblacionInicial(configOCH, self.controlador.gestor)
+            # Arreglamos el texto multiplicando ambos valores
+            total_esperado = configOCH.numeroHormigas * configOCH.grupoHormigas
+            print(f"Sistema: Generando {total_esperado} planillas iniciales ({configOCH.grupoHormigas} grupos de {configOCH.numeroHormigas})...")
             
-            # 5. Feedback visual de éxito
-            mensaje = f"Se generaron exitosamente {len(poblacionInicial)} planillas de horarios factibles."
-            print(f"Sistema: {mensaje}")
-            messagebox.showinfo("Fase 1 Completada", mensaje)
+            poblacion_inicial = generarPoblacionInicial(configOCH, self.controlador.gestor)
+
+            # --- Final OCH ---
+            print(f"Sistema: ¡Terminado! La lista real tiene {len(poblacion_inicial)} planillas.")
+
+            # ==========================================
+            # FASE 3: EVOLUCIÓN GENÉTICA
+            # ==========================================
+            print("Sistema: Configurando motor genético...")
+            algoritmoAG(configAG) 
             
-        except ValueError:
-            messagebox.showerror("Error de Formato", "Por favor, verifique que todos los campos del OCH contengan valores numéricos válidos.")
+            print("Sistema: ¡Iniciando ciclo evolutivo! Por favor espere...")
+            poblacion_final = ejecutarCicloGenetico(poblacion_inicial, configAG, self.controlador.gestor)
+            
+            campeon = poblacion_final[0]
+
+            # ==========================================
+            # FASE 4: ACTUALIZACIÓN DE LA INTERFAZ
+            # ==========================================
+            print("Sistema: Evolución terminada. Actualizando gráficos...")
+            
+            # 4.1 Actualizar Textos
+            minutos, segundos = divmod(configAG.tiempo_ejecucion_final, 60)
+            self.lblTiempo.config(text=f"Tiempo de ejecución: {int(minutos)}m {int(segundos)}s")
+            self.lblGeneracion.config(text=f"Número de generación: {configAG.generacion_actual}")
+            self.lblAptitud.config(text=f"Función de aptitud: {campeon.funcionAptitud:.4f}")
+
+            # 4.2 Actualizar Gráfico
+            self.ax.clear() 
+            eje_x = list(range(len(configAG.historial_maximos)))
+            
+            self.ax.fill_between(eje_x, configAG.historial_maximos, color='red', label='Máximo')
+            self.ax.fill_between(eje_x, configAG.historial_promedios, color='lime', label='Promedio')
+            
+            self.ax.set_title("Evolución de la Población", fontsize=10, fontweight='bold')
+            self.ax.set_xlabel("Generaciones", fontweight='bold')
+            self.ax.set_ylabel("Función de Aptitud", fontweight='bold')
+            
+            # Ajuste dinámico del eje X para que coincida con las generaciones reales
+            max_x = max(1, configAG.generacion_actual - 1) if configAG.generacion_actual > 0 else 1
+            self.ax.set_xlim(0, max_x) 
+            
+            self.ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25), ncol=2)
+            
+            self.canvas.draw()
+
+            messagebox.showinfo("Proceso Terminado", 
+                                f"Se completó la optimización de horarios.\n\n"
+                                f"Generaciones evaluadas: {configAG.generacion_actual}\n"
+                                f"Aptitud final alcanzada: {campeon.funcionAptitud:.4f}")
+
+        except ValueError as ve:
+            messagebox.showerror("Error de Formato", "Verifique que todos los campos contengan números válidos.\nDetalle: " + str(ve))
         except Exception as e:
             messagebox.showerror("Error de Ejecución", f"Ocurrió un error inesperado:\n{str(e)}")
