@@ -17,22 +17,21 @@ class AppPrincipal(tk.Tk):
         anchoVentana = 1100
         altoVentana = 790
 
-        # Obtención de la resolución total de la pantalla del usuario
+        # Obtención de la resolución primaria del hardware del usuario.
         anchoPantalla = self.winfo_screenwidth()
         altoPantalla = self.winfo_screenheight()
 
-        # Cálculo de las coordenadas X e Y para el centrado
+        # Cálculo algebraico de las coordenadas X e Y para el centrado de la interfaz.
         posicionX = int((anchoPantalla / 2) - (anchoVentana / 2))
         
-        # Se aplica un offset de -40 píxeles en el eje Y para compensar 
-        # visualmente el espacio de la barra de tareas del sistema operativo.
+        # Se aplica un offset vertical (-40px) para compensar la barra de tareas del sistema operativo.
         posicionY = int((altoPantalla / 2) - (altoVentana / 2)) - 40
 
         # Asignación de la geometría en formato "anchoxalto+X+Y"
         self.geometry(f"{anchoVentana}x{altoVentana}+{posicionX}+{posicionY}")
         # ---------------------------------------------------------
 
-        # Instanciación del gestor de datos que mantendrá el estado global de la aplicación.
+        # Inicialización del gestor de datos (Singleton de estado global).
         self.gestor = GestorDatos() 
 
         # Contenedor principal donde se renderizarán las vistas dinámicas.

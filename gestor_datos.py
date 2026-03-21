@@ -46,7 +46,7 @@ class GestorDatos:
                     )
                     self.listaFacilitadores.append(nuevoFacilitador)
                 
-                print(f"Sistema: Cargados {len(self.listaFacilitadores)} facilitadores en memoria.")
+                print(f"[SISTEMA] Procesamiento exitoso: {len(self.listaFacilitadores)} instancias de Facilitador cargadas.")
                 return True, "Carga completada"
 
             # ----------------------------------------------------
@@ -75,7 +75,7 @@ class GestorDatos:
                     )
                     self.listaTrayectos.append(nuevoTrayecto)
 
-                print(f"Sistema: Cargados {len(self.listaTrayectos)} trayectos en memoria.")
+                print(f"[SISTEMA] Procesamiento exitoso: {len(self.listaTrayectos)} instancias de Trayecto cargadas.")
                 return True, "Carga completada"
 
             # ----------------------------------------------------
@@ -109,7 +109,7 @@ class GestorDatos:
                         
                         facilitador.disponibilidadTrayecto = nuevaDisponibilidad
 
-                print(f"Sistema: Creadas {vinculacionesHechas} vinculaciones Facilitador-Trayecto.")
+                print(f"[SISTEMA] Generación de relaciones: {vinculacionesHechas} vínculos Facilitador-Trayecto inicializados.")
                 return True, "Carga completada"
 
             # ----------------------------------------------------
@@ -121,7 +121,7 @@ class GestorDatos:
 
                 df = pd.read_csv(rutaArchivo)
                 
-                # Mapeo de horas de formato string a módulos discretos de 15 minutos
+                # Transformación de representación horaria en texto a intervalos discretos de 15 minutos.
                 mapaHoras = {
                     '8:00': [1,2,3,4],       '9:00': [5,6,7,8],       '10:00': [9,10,11,12],
                     '11:00': [13,14,15,16],  '12:00': [17,18,19,20],  '13:00': [21,22,23,24],
@@ -157,7 +157,7 @@ class GestorDatos:
                                     dispDelDia.agregarModulo(nuevoModulo)
                                     modulosCreados += 1
 
-                print(f"Sistema: Creados {modulosCreados} módulos de disponibilidad horaria.")
+                print(f"[SISTEMA] Instanciación modular: {modulosCreados} franjas horarias de disponibilidad creadas.")
                 return True, "Carga completada"
 
             # ----------------------------------------------------
@@ -240,7 +240,7 @@ class GestorDatos:
                     )
                     self.listaClases.append(nuevaClase)
 
-                print(f"Sistema: Cargadas {len(self.listaClases)} clases en memoria.")
+                print(f"[SISTEMA] Procesamiento exitoso: {len(self.listaClases)} instancias de Clase estructuradas.")
                 return True, "Carga completada"
 
             return False, "Error: Clave de archivo no reconocida por el sistema."

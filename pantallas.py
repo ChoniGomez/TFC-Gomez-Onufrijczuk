@@ -1,4 +1,6 @@
 import tkinter as tk
+import os
+from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
 import pandas as pd
 import numpy as np
@@ -6,13 +8,11 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from clases import OCH
 
-# --- ACTUALIZACIÓN DE IMPORTS ---
 from algoritmo import (algoritmoOCH, generarPoblacionInicial, evaluarFuncionAptitud, 
                        algoritmoAG, ejecutarCicloGenetico)
 
-# --- NUEVA CLASE PARA EL AG ---
 class ConfiguracionAG:
-    """Clase para empaquetar los parámetros del Algoritmo Genético"""
+    """Estructura para el encapsulamiento de los parámetros del Algoritmo Genético."""
     def __init__(self):
         pass
 
@@ -122,27 +122,25 @@ class PantallaAlgoritmo(tk.Frame):
     def crearPanelIzquierdo(self):
         """
         Inicializa y renderiza el panel de gráficos estadísticos de evolución.
-        --- MODIFICADO PARA INICIAR VACÍO ---
         """
         frameIzq = tk.Frame(self, padx=10, pady=10)
         frameIzq.grid(row=0, column=0, sticky="nsew")
 
-        lfGrafico = ttk.LabelFrame(frameIzq, text="Gráfico de Evolución")
+        lfGrafico = ttk.LabelFrame(frameIzq, text="Evolución de la Población")
         lfGrafico.pack(fill="both", expand=True, pady=10)
 
-        # Guardamos la figura, el eje y el canvas en 'self'
         self.fig = Figure(figsize=(5, 4), dpi=100)
         self.ax = self.fig.add_subplot(111)
         
-        # Gráfico inicial vacío y elegante
+        # Configuración inicial del área de graficación (estado de espera).
         self.ax.set_title('Evolución de la Población', fontsize=10, fontweight='bold')
         self.ax.set_xlabel('Generaciones', fontweight='bold')
         self.ax.set_ylabel('Función de Aptitud', fontweight='bold')
         self.ax.set_xlim(0, 100)
         self.ax.set_ylim(0, 1.0)
         
-        self.ax.text(50, 0.5, "Esperando parámetros y ejecución...", 
-                     ha='center', va='center', fontsize=10, alpha=0.5)
+        self.ax.text(50, 0.5, "En espera de inicialización del proceso...", 
+                     ha='center', va='center', fontsize=10, alpha=0.6)
         
         self.fig.tight_layout()
 
@@ -347,7 +345,7 @@ class PantallaAlgoritmo(tk.Frame):
         btnEjecutar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
 
         btnExportar = tk.Button(frameBotones, text="Exportar Horarios", bg="#2196F3", fg="white", font=("Arial", 10, "bold"),
-                                command=lambda: print("Sistema: Exportando resultados..."))
+                                command=lambda: print("[SISTEMA] Exportación de resultados solicitada."))
         btnExportar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
 
         btnCancelar = tk.Button(frameBotones, text="Cancelar", bg="#f44336", fg="white", font=("Arial", 10, "bold"),
@@ -360,17 +358,16 @@ class PantallaAlgoritmo(tk.Frame):
         """
         self.controlador.mostrarPantalla(PantallaCarga)
 
-    # --- MODIFICADO: DIRECTOR DE ORQUESTA COMPLETO ---
     def ejecutarAlgoritmo(self):
         """
-        Captura los parámetros de la interfaz, inicializa OCH para la 
-        población inicial, ejecuta el Algoritmo Genético y actualiza la interfaz.
+        Orquesta la captura de parámetros, la inicialización espacial (OCH),
+        la evolución poblacional (AG) y la actualización asíncrona de la vista.
         """
         try:
             # ==========================================
             # FASE 1: CAPTURA DE PARÁMETROS
             # ==========================================
-            print("Sistema: Leyendo parámetros de la interfaz...")
+            print("[SISTEMA] Evaluando parámetros de configuración gráfica...")
             
             # 1.1 Parámetros OCH
             configOCH = OCH(
@@ -395,37 +392,83 @@ class PantallaAlgoritmo(tk.Frame):
             configAG.seleccionRuleta = float(self.entRuleta.get())
             configAG.seleccionElitista = float(self.entElitista.get())
             configAG.probGeneralMutacion = float(self.entProb.get())
+            
+            # Parámetros adicionales capturados de la vista
+            configAG.presionSelectiva = float(self.entPresion.get())
+            configAG.puntosCruza = int(self.entCruza.get())
+            configAG.probMutacionF1 = float(self.entPf1.get())
+            configAG.probMutacionF2 = float(self.entPf2.get())
+            configAG.probMutacionFC = float(self.entPfc.get())
+            configAG.probMutacionPEE = float(self.entPfe.get())
+
+            # ==========================================
+            # FASE 1.5: GUARDAR DATOS EN ARCHIVO .TXT
+            # ==========================================
+            carpeta_logs = "logs_ejecucion"
+            if not os.path.exists(carpeta_logs):
+                os.makedirs(carpeta_logs)
+                
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            nombre_archivo = os.path.join(carpeta_logs, f"ejecucion_{timestamp}.txt")
+            
+            with open(nombre_archivo, "w", encoding="utf-8") as f:
+                f.write("==================================================\n")
+                f.write(f"LOG DE EJECUCIÓN - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write("==================================================\n\n")
+                f.write("--- PARÁMETROS DE PARADA ---\n")
+                f.write(f"Generaciones a evaluar: {configAG.numeroGeneraciones}\n")
+                f.write(f"Minutos máximos de ejecución: {configAG.minutosEjecucion}\n\n")
+                f.write("--- PARÁMETROS OPTIMIZACIÓN COLONIA DE HORMIGAS (OCH) ---\n")
+                f.write(f"Número de Hormigas: {configOCH.numeroHormigas}\n")
+                f.write(f"Grupo de Hormigas: {configOCH.grupoHormigas}\n")
+                f.write(f"Feromona Inicial: {configOCH.feromonaInicial}\n")
+                f.write(f"Tasa Evaporación: {configOCH.evaporacionFeromona}\n")
+                f.write(f"Depósito de Feromona: {configOCH.premioFeromona}\n")
+                f.write(f"Peso Heurístico: {configOCH.importanciaHeuristica}\n")
+                f.write(f"Peso Feromona: {configOCH.importanciaFeromona}\n\n")
+                f.write("--- PARÁMETROS ALGORITMO GENÉTICO (AG) ---\n")
+                f.write(f"Selección Torneo (%): {configAG.seleccionTorneo}\n")
+                f.write(f"Selección Ruleta (%): {configAG.seleccionRuleta}\n")
+                f.write(f"Selección Elitista (%): {configAG.seleccionElitista}\n")
+                f.write(f"Presión Selectiva: {configAG.presionSelectiva}\n")
+                f.write(f"Puntos Cruza: {configAG.puntosCruza}\n")
+                f.write(f"Probabilidad General Mutación: {configAG.probGeneralMutacion}\n")
+                f.write(f"Prob. Mutación F1: {configAG.probMutacionF1}\n")
+                f.write(f"Prob. Mutación F2: {configAG.probMutacionF2}\n")
+                f.write(f"Prob. Mutación FC: {configAG.probMutacionFC}\n")
+                f.write(f"Prob. Mutación PEE: {configAG.probMutacionPEE}\n")
+                
+            print(f"[SISTEMA] Registro de configuración guardado en {nombre_archivo}.")
 
             # ==========================================
             # FASE 2: COLONIA DE HORMIGAS (Población Inicial)
             # ==========================================
-            print("Sistema: Inicializando Matriz de Feromonas OCH...")
+            print("[SISTEMA] Desplegando Matriz global de Feromonas OCH.")
             algoritmoOCH(configOCH, self.controlador.gestor)
             
-            # Arreglamos el texto multiplicando ambos valores
             total_esperado = configOCH.numeroHormigas * configOCH.grupoHormigas
-            print(f"Sistema: Generando {total_esperado} planillas iniciales ({configOCH.grupoHormigas} grupos de {configOCH.numeroHormigas})...")
+            print(f"[SISTEMA] Construyendo heurísticamente {total_esperado} soluciones base (Configuración: {configOCH.grupoHormigas} sub-colonias).")
             
             poblacion_inicial = generarPoblacionInicial(configOCH, self.controlador.gestor)
 
-            # --- Final OCH ---
-            print(f"Sistema: ¡Terminado! La lista real tiene {len(poblacion_inicial)} planillas.")
+            # --- Finalización Constructiva ---
+            print(f"[SISTEMA] Población inicial conformada por {len(poblacion_inicial)} individuos estocásticos.")
 
             # ==========================================
             # FASE 3: EVOLUCIÓN GENÉTICA
             # ==========================================
-            print("Sistema: Configurando motor genético...")
+            print("[SISTEMA] Parametrizando motor de inferencia genética.")
             algoritmoAG(configAG) 
             
-            print("Sistema: ¡Iniciando ciclo evolutivo! Por favor espere...")
-            poblacion_final = ejecutarCicloGenetico(poblacion_inicial, configAG, self.controlador.gestor)
+            print("[SISTEMA] Inicializando evaluación generacional. Procesando en segundo plano...")
+            poblacion_final = ejecutarCicloGenetico(poblacion_inicial, configAG, self.controlador.gestor, log_file=nombre_archivo)
             
             campeon = poblacion_final[0]
 
             # ==========================================
             # FASE 4: ACTUALIZACIÓN DE LA INTERFAZ
             # ==========================================
-            print("Sistema: Evolución terminada. Actualizando gráficos...")
+            print("[SISTEMA] Proceso evolutivo concluido. Renderizando métricas resultantes.")
             
             # 4.1 Actualizar Textos
             minutos, segundos = divmod(configAG.tiempo_ejecucion_final, 60)

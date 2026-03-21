@@ -4,7 +4,7 @@ import time
 import copy
 from clases import Hormiga, Cromosoma, Gen
 
-# Importación de las restricciones individuales (Ahora adaptadas para tensores)
+# Importación de las restricciones del modelo adaptadas para el procesamiento tensorial
 from restricciones import FR1, FR2, FR3, FR4, FR5, FR6, FR7, FR8
 
 # =========================================================================
@@ -169,18 +169,18 @@ def inicializarEntornoMatricial(gestorDatos):
     vector_es_pee = np.zeros(num_fac, dtype=int)
     vector_perfil_fac = np.zeros(num_fac, dtype=int)
     
-    # ==========================================================
-    # NUEVO: CÁLCULO DINÁMICO DE LÍMITES (Evitando "Hardcoding")
-    # ==========================================================
-    # 1. Buscamos el ID máximo de trayecto
+    # =====================================================================
+    # CÁLCULO DINÁMICO DE LÍMITES DIMENSIONALES 
+    # =====================================================================
+    # 1. Determinación del ID máximo correspondiente a los trayectos
     max_id_trayecto = max([int(t.idTrayecto) for t in gestorDatos.listaTrayectos] + [0])
     
-    # 2. Buscamos el ID máximo de módulo escaneando clases y disponibilidades
+    # 2. Determinación del ID máximo correspondiente a los módulos horarios
     modulos_en_clases = [int(m.numeroModulo) for c in gestorDatos.listaClases for m in c.horarioDeClase.modulos]
     modulos_en_disp = [int(m.numeroModulo) for f in gestorDatos.listaFacilitadores for d in f.disponibilidadesHorarias for m in d.modulos]
     max_id_modulo = max(modulos_en_clases + modulos_en_disp + [0])
     
-    # Creamos las matrices con el tamaño exacto que requieren los datos (+1 por el índice 0)
+    # Inicialización de matrices con dimensiones ajustadas (se añade offset por índice base 0)
     matriz_disp_horaria = np.zeros((num_fac, 7, max_id_modulo + 1), dtype=int)
     matriz_conocimiento_trayecto = np.zeros((num_fac, max_id_trayecto + 1), dtype=int)
 
@@ -339,7 +339,7 @@ def operadorSeleccion(tensor_poblacion, aptitudes, elitismo, torneo, ruleta):
             
     return poblacion_intermedia
 
-def operadorCruza(poblacion_intermedia, cantidad_elite, prob_cruza=0.90):
+def operadorCruza(poblacion_intermedia, cantidad_elite, prob_cruza=0.90, puntos_cruza=3):
     """
     Aplica el operador de cruce multipunto mediante partición e intercambio 
     de segmentos de matrices (Slicing).
@@ -361,7 +361,8 @@ def operadorCruza(poblacion_intermedia, cantidad_elite, prob_cruza=0.90):
         idx_p2 = indices_padres[i+1]
         
         if random.random() <= prob_cruza:
-            cortes = sorted(random.sample(range(1, num_clases), 3))
+            num_cortes = min(puntos_cruza, num_clases - 1)
+            cortes = sorted(random.sample(range(1, num_clases), num_cortes))
             
             hijo1 = poblacion_intermedia[idx_p1].copy()
             hijo2 = poblacion_intermedia[idx_p2].copy()
@@ -381,7 +382,7 @@ def operadorCruza(poblacion_intermedia, cantidad_elite, prob_cruza=0.90):
             
     return poblacion_cruzada
 
-def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutacion=0.05):
+def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutacion=0.05, probs_mutacion=None):
     """
     Aplica alteraciones genéticas aleatorias sobre las matrices generadas, 
     garantizando la integridad referencial de los índices de facilitadores.
@@ -402,7 +403,16 @@ def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutaci
             roles_activos = np.where(poblacion_cruzada[idx_real, clase_idx] != -1)[0]
             if len(roles_activos) == 0: continue
             
-            rol_a_mutar = np.random.choice(roles_activos)
+            if probs_mutacion is not None:
+                probs_activos = [probs_mutacion[r] for r in roles_activos]
+                suma_probs = sum(probs_activos)
+                if suma_probs > 0:
+                    probs_activos = [p / suma_probs for p in probs_activos]
+                    rol_a_mutar = np.random.choice(roles_activos, p=probs_activos)
+                else:
+                    rol_a_mutar = np.random.choice(roles_activos)
+            else:
+                rol_a_mutar = np.random.choice(roles_activos)
             
             if rol_a_mutar == 3:
                 if len(ids_pee) > 0:
@@ -427,15 +437,15 @@ def algoritmoAG(configAG):
     configAG.tiempo_inicio = time.time()
     configAG.tiempo_ejecucion_final = 0.0
 
-def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos):
+def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos, log_file=None):
     """
     Controlador principal. Mapea la población a tensores matriciales, evalúa,
     aplica presiones evolutivas y decodifica el resultado óptimo al formato original.
     """
-    print("Sistema: Inicializando entorno matricial de restricciones...")
+    print("[SISTEMA] Inicializando entorno matricial de validación de restricciones.")
     datos_numpy = inicializarEntornoMatricial(gestorDatos)
     
-    print("Sistema: Codificando población inicial a modelo tensorial...")
+    print("[SISTEMA] Transformando población inicial al modelo tensorial.")
     tensor_poblacion = codificarPoblacionMatricial(poblacion_objetos, datos_numpy)
     
     num_individuos = tensor_poblacion.shape[0]
@@ -450,31 +460,38 @@ def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos):
     elitismo = configAG.seleccionElitista
     cantidad_elite = max(1, int(num_individuos * elitismo))
 
-    print("Sistema: Iniciando ciclo evolutivo del Algoritmo Genético...")
+    print("[SISTEMA] Iniciando ciclo evolutivo del Algoritmo Genético.")
 
     while True:
         # Verificación de criterios de convergencia y parada
         if configAG.generacion_actual >= configAG.numeroGeneraciones:
-            print(f"Sistema: Criterio de parada alcanzado: Límite de generaciones ({configAG.numeroGeneraciones}).")
+            print(f"[SISTEMA] Criterio de parada alcanzado: Límite de iteraciones ({configAG.numeroGeneraciones}).")
             break
             
         tiempo_transcurrido_minutos = (time.time() - configAG.tiempo_inicio) / 60.0
         if tiempo_transcurrido_minutos >= configAG.minutosEjecucion:
-            print(f"Sistema: Criterio de parada alcanzado: Límite de tiempo ({configAG.minutosEjecucion} min).")
+            print(f"[SISTEMA] Criterio de parada alcanzado: Límite temporal ({configAG.minutosEjecucion} min).")
             break
             
         if np.max(aptitudes) >= 1.0:
-            print("Sistema: Solución óptima global encontrada (Aptitud 1.0).")
+            print("[SISTEMA] Convergencia absoluta: Solución óptima global alcanzada (Aptitud = 1.0).")
             break
             
         # Aplicación de operadores genéticos matriciales
         pob_intermedia = operadorSeleccion(tensor_poblacion, aptitudes, elitismo, 
                                            configAG.seleccionTorneo, configAG.seleccionRuleta)
         
-        pob_cruzada = operadorCruza(pob_intermedia, cantidad_elite, prob_cruza=0.90)
+        pob_cruzada = operadorCruza(pob_intermedia, cantidad_elite, prob_cruza=0.90, puntos_cruza=configAG.puntosCruza)
         
-        tensor_poblacion = operadorMutacion(pob_cruzada, datos_numpy, cantidad_elite, 
-                                            prob_mutacion=configAG.probGeneralMutacion)
+        probs_roles = [
+            configAG.probMutacionF1,
+            configAG.probMutacionF2,
+            configAG.probMutacionFC,
+            configAG.probMutacionPEE
+        ]
+        tensor_poblacion = operadorMutacion(pob_cruzada, datos_numpy, cantidad_elite,
+                                            prob_mutacion=configAG.probGeneralMutacion,
+                                            probs_mutacion=probs_roles)
         
         # Evaluación de la descendencia
         for i in range(num_individuos):
@@ -487,10 +504,52 @@ def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos):
 
     configAG.tiempo_ejecucion_final = time.time() - configAG.tiempo_inicio
     
-    print("Sistema: Evolución finalizada. Decodificando cromosoma óptimo...")
+    print("[SISTEMA] Evolución finalizada. Decodificando cromosoma óptimo.")
     idx_mejor = np.argmax(aptitudes)
     matriz_campeona = tensor_poblacion[idx_mejor]
     
+    # --- CÁLCULO CONSOLIDADO DE RESTRICCIONES ---
+    v_fr1 = FR1(matriz_campeona, datos_numpy)
+    v_fr2 = FR2(matriz_campeona, datos_numpy)
+    v_fr3 = FR3(matriz_campeona, datos_numpy)
+    v_fr4 = FR4(matriz_campeona, datos_numpy)
+    v_fr5 = FR5(matriz_campeona, datos_numpy)
+    v_fr6 = FR6(matriz_campeona, datos_numpy)
+    v_fr7 = FR7(matriz_campeona, datos_numpy)
+    v_fr8 = FR8(matriz_campeona, datos_numpy)
+
+    # --- REPORTE DE PENALIZACIONES DE LA MEJOR SOLUCIÓN ---
+    print("\n==================================================")
+    print("[SISTEMA] Desglose de penalizaciones del cromosoma campeón:")
+    print(f" - FR1 (Choques de horario)        : {v_fr1}")
+    print(f" - FR2 (Disponibilidad horaria)    : {v_fr2}")
+    print(f" - FR3 (Horas semanales)           : {v_fr3}")
+    print(f" - FR4 (Liderazgo en Sprints)      : {v_fr4}")
+    print(f" - FR5 (Límite de Sprints)         : {v_fr5}")
+    print(f" - FR6 (PEE obligatorio)           : {v_fr6}")
+    print(f" - FR7 (Compatibilidad de parejas) : {v_fr7}")
+    print(f" - FR8 (Competencia en trayecto)   : {v_fr8}")
+    print("==================================================\n")
+
+    # --- PERSISTENCIA DE RESULTADOS FINALES EN ARCHIVO DE REGISTRO ---
+    if log_file:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write("\n==================================================\n")
+            f.write("RESULTADOS FINALES DE LA EJECUCIÓN\n")
+            f.write("==================================================\n")
+            f.write(f"Tiempo total de ejecución : {configAG.tiempo_ejecucion_final:.2f} segundos\n")
+            f.write(f"Aptitud de la mejor solución: {aptitudes[idx_mejor]:.4f}\n\n")
+            f.write("--- DESGLOSE DE PENALIZACIONES ---\n")
+            f.write(f" - FR1 (Choques de horario)        : {v_fr1}\n")
+            f.write(f" - FR2 (Disponibilidad horaria)    : {v_fr2}\n")
+            f.write(f" - FR3 (Horas semanales)           : {v_fr3}\n")
+            f.write(f" - FR4 (Liderazgo en Sprints)      : {v_fr4}\n")
+            f.write(f" - FR5 (Límite de Sprints)         : {v_fr5}\n")
+            f.write(f" - FR6 (PEE obligatorio)           : {v_fr6}\n")
+            f.write(f" - FR7 (Compatibilidad de parejas) : {v_fr7}\n")
+            f.write(f" - FR8 (Competencia en trayecto)   : {v_fr8}\n")
+            f.write("==================================================\n")
+
     modelo_cromosoma = poblacion_objetos[0]
     cromosoma_ganador = decodificarCromosomaOptimo(matriz_campeona, modelo_cromosoma, datos_numpy)
     cromosoma_ganador.funcionAptitud = aptitudes[idx_mejor]

@@ -20,7 +20,7 @@ class Facilitador(Persona):
         self.tipoFacilitador = tipoFacilitador 
         self.disponibilidadTrayecto = None 
         
-        # Lista para almacenar los objetos DisponibilidadHoraria correspondientes a cada día.
+        # Estructura para almacenar las instancias de DisponibilidadHoraria contractuales.
         self.disponibilidadesHorarias = [] 
 
     def agregarDisponibilidadDia(self, disponibilidadDia):
@@ -65,7 +65,7 @@ class ModuloDeHorario:
         self.numeroModulo = int(numeroModulo)
 
     def __repr__(self):
-        # Formato de representación abreviado para facilitar el seguimiento en consola (ej. [M12]).
+        # Representación formateada para trazabilidad en registros (ej. [M12]).
         return f"[M{self.numeroModulo}]"
 
 class DisponibilidadHoraria:
@@ -108,7 +108,7 @@ class Clase:
         self.trayecto = trayecto
         self.horarioDeClase = horarioDeClase
         
-        # Los facilitadores inician nulos y serán asignados dinámicamente por el algoritmo de optimización.
+        # Inicialización de atributos docentes; la asignación se gestiona dinámicamente por la optimización.
         self.facilitador1 = None
         self.facilitador2 = None
         self.facilitadorComplementario = None
@@ -141,8 +141,8 @@ class OCH:
         self.importanciaFeromona = float(importanciaFeromona)
         self.premioFeromona = float(premioFeromona)
         
-        # Matriz de tipo double que representa el rastro de feromonas del sistema.
-        # En la implementación se utiliza un diccionario con clave tupla (idClase, idFacilitador)
+        # Estructura de datos dispersa (diccionario) para representar la matriz de feromonas.
+        # Clave: Tupla (idClase, idFacilitador) | Valor: Nivel de concentración.
         self.feromonaGlobal = feromonaGlobal if feromonaGlobal is not None else {}
 
     def __repr__(self):
