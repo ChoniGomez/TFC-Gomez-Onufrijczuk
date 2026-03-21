@@ -170,38 +170,16 @@ def FR5(cromosoma, gestorDatos):
 
 def FR6(cromosoma, gestorDatos):
     """
-<<<<<<< HEAD
-    Restricción 6 (R6): PEE obligatorio en clases integradas (Tipo 2 y 4).
-    Verifica que las clases marcadas con 'SI' en el CSV tengan un PEE asignado.
+    Restricción 6 (R6): PEE obligatorio en clases integradas (Tipo 3 y 4).
     """
     vector_tipo_clase = gestorDatos["tipo_clase"]
     
-    # CORRECCIÓN: Según gestor_datos.py, los tipos 2 y 4 son los que requieren PEE
-    necesita_pee = (vector_tipo_clase == 2) | (vector_tipo_clase == 4)
+    necesita_pee = (vector_tipo_clase == 3) | (vector_tipo_clase == 4)
+    asignaciones_pee = cromosoma[:, 3] # La columna 3 corresponde al rol PEE
     
-    # Extraemos la columna 3, que corresponde a los IDs del rol PEE en el cromosoma
-    asignaciones_pee = cromosoma[:, 3] 
-    
-    # Buscamos dónde la clase necesita PEE (True) pero el casillero está vacío (-1)
+    # Buscamos dónde necesita PEE y el valor está vacío (-1)
     infracciones = necesita_pee & (asignaciones_pee == -1)
     
-    # Retornamos la suma total de infracciones (penalizaciones)
-=======
-    Restricción 6 (R6): PEE obligatorio.
-    CORREGIDO: Solo penaliza los Tipos 2 y 4 (que son los que piden PEE 
-    según la lógica del cargador).
-    """
-    vector_tipo_clase = gestorDatos["tipo_clase"]
-    
-    # Tipos de clase que 'necesitanProfEspecial'
-    necesita_pee = (vector_tipo_clase == 2) | (vector_tipo_clase == 4)
-    
-    asignaciones_pee = cromosoma[:, 3]
-    
-    # Infracción si la clase requiere (2 o 4) pero el rol 3 está vacío (-1)
-    infracciones = necesita_pee & (asignaciones_pee == -1)
-    
->>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
     return np.sum(infracciones)
 
 
