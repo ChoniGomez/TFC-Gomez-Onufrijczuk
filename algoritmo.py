@@ -4,7 +4,11 @@ import time
 import copy
 from clases import Hormiga, Cromosoma, Gen
 
+<<<<<<< HEAD
 # Importación de las restricciones individuales (Ahora adaptadas para tensores)
+=======
+# Importación de las restricciones individuales
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
 from restricciones import FR1, FR2, FR3, FR4, FR5, FR6, FR7, FR8
 
 # =========================================================================
@@ -37,16 +41,25 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
     
     diaClase = clase.horarioDeClase.dia
     modulosClaseActual = set(m.idModuloDeHorario for m in clase.horarioDeClase.modulos)
-    
+    horasClaseActual = len(clase.horarioDeClase.modulos) / 4.0
+
     for facilitador in candidatos:
         idCandidato = facilitador.idFacilitador
         tipoCandidato = facilitador.tipoFacilitador.idTipo
         
+<<<<<<< HEAD
         # Filtro excluyente por tipo de perfil requerido
         if esPee and tipoCandidato != 4: continue
         if not esPee and tipoCandidato == 4: continue
 
         # Validación de competencias formativas (Trayecto)
+=======
+        # 1. Filtro excluyente por tipo de perfil requerido
+        if esPee and tipoCandidato != 4: continue
+        if not esPee and tipoCandidato == 4: continue
+
+        # 2. Validación de competencias formativas (Trayecto)
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
         esCompetente = False
         if clase.trayecto is None:
             esCompetente = True
@@ -57,7 +70,11 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
                     break
         if not esCompetente: continue
         
+<<<<<<< HEAD
         # Validación de disponibilidad horaria contractual
+=======
+        # 3. Validación de disponibilidad horaria contractual
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
         estaDisponible = False
         for disp in facilitador.disponibilidadesHorarias:
             if disp.dia == diaClase:
@@ -66,6 +83,7 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
                     estaDisponible = True
                     break
         if not estaDisponible: continue
+<<<<<<< HEAD
         
         # Validación de solapamiento horario con asignaciones previas en el cromosoma
         tieneChoque = False
@@ -75,6 +93,27 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
             if idCandidato in [genAnterior.idFacilitador1, genAnterior.idFacilitador2, 
                                genAnterior.idFacilitadorComplementario, genAnterior.idProfesorEducacionEspecial]:
                 
+=======
+
+        # 4. Control preventivo de carga horaria (FR3)
+        horasAcumuladas = 0.0
+        for gen in cromosomaActual.genes:
+            if idCandidato in [gen.idFacilitador1, gen.idFacilitador2, 
+                               gen.idFacilitadorComplementario, gen.idProfesorEducacionEspecial]:
+                clase_previa = next((c for c in gestorDatos.listaClases if c.idClase == gen.idGen), None)
+                if clase_previa:
+                    horasAcumuladas += len(clase_previa.horarioDeClase.modulos) / 4.0
+
+        if (horasAcumuladas + horasClaseActual) > facilitador.cantidadHorasCumplir:
+            continue
+        
+        # 5. Validación de solapamiento horario (Choque de horas)
+        tieneChoque = False
+        for genAnterior in cromosomaActual.genes:
+            if genAnterior.idGen == clase.idClase: continue 
+            if idCandidato in [genAnterior.idFacilitador1, genAnterior.idFacilitador2, 
+                               genAnterior.idFacilitadorComplementario, genAnterior.idProfesorEducacionEspecial]:
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
                 claseAnterior = next((c for c in gestorDatos.listaClases if c.idClase == genAnterior.idGen), None)
                 if claseAnterior and claseAnterior.horarioDeClase.dia == diaClase:
                     modulosAnteriores = set(m.idModuloDeHorario for m in claseAnterior.horarioDeClase.modulos)
@@ -83,7 +122,11 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
                         break
         if tieneChoque: continue 
 
+<<<<<<< HEAD
         # Cálculo de atractivo heurístico
+=======
+        # Cálculo de atractivo (Feromona + Heurística)
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
         eta = 1.0 
         tau = och.feromonaGlobal.get((clase.idClase, idCandidato), och.feromonaInicial)
         atractivo = (tau ** och.importanciaFeromona) * (eta ** och.importanciaHeuristica)
@@ -92,10 +135,16 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
             atractivos[idCandidato] = atractivo
             sumaAtractivos += atractivo
 
+<<<<<<< HEAD
     # Resolución en caso de conjunto de candidatos vacío
     if sumaAtractivos == 0.0:
         validos = [f for f in candidatos if (f.tipoFacilitador.idTipo == 4) == esPee]
         if validos: return random.choice(validos).idFacilitador
+=======
+    # Resolución en caso de conjunto de candidatos vacío (Blindaje FR3)
+    if sumaAtractivos == 0.0:
+        # Se prioriza no asignar a nadie antes que generar un conflicto contractual masivo
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
         return None
 
     # Selección mediante ruleta proporcional
@@ -109,8 +158,14 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
 
 def generarPoblacionInicial(och, gestorDatos):
     """
+<<<<<<< HEAD
     Ejecuta el ciclo constructivo de la Colonia de Hormigas.
     Retorna una lista de objetos Cromosoma que representan soluciones factibles iniciales.
+=======
+    Construye la población inicial mediante un proceso de dos fases:
+    Fase 1: Asignación de roles críticos (F1, F2 y PEE) para garantizar la cobertura.
+    Fase 2: Asignación de roles complementarios (FC) sujeta a disponibilidad de horas.
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
     """
     poblacionTotal = []
     grupos = och.grupoHormigas if och.grupoHormigas > 0 else 1
@@ -120,20 +175,42 @@ def generarPoblacionInicial(och, gestorDatos):
     for numGrupo in range(grupos):
         poblacionDelGrupo = []
         for _ in range(hormigasPorGrupo):
-            hormiga = Hormiga(idHormiga=idHormigaGlobal, algoritmoOCH=och, poblacion=None)
-            cromosomaActual = Cromosoma(idCromosoma=idHormigaGlobal, funcionAptitud=0.0, ordenCromosoma=idHormigaGlobal, poblacion=None)
+            cromosomaActual = Cromosoma(idCromosoma=idHormigaGlobal, funcionAptitud=0.0, 
+                                        ordenCromosoma=idHormigaGlobal, poblacion=None)
             
+            # Inicialización de la estructura de genes vacíos
             for clase in gestorDatos.listaClases:
                 genNuevo = Gen(idGen=clase.idClase, idFacilitador1=None, idFacilitador2=None, 
                                idFacilitadorComplementario=None, idProfesorEducacionEspecial=None, 
                                evaluar=True, cromosoma=cromosomaActual)
                 cromosomaActual.agregarGen(genNuevo)
+<<<<<<< HEAD
                 genNuevo.idFacilitador1 = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "F1")
                 genNuevo.idFacilitador2 = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "F2")
                 genNuevo.idFacilitadorComplementario = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "FC")
                 
                 if clase.tipoDeClase == 3 or clase.tipoDeClase == 4:
                     genNuevo.idProfesorEducacionEspecial = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "PEE")
+=======
+            
+            # PASO 1: Asignación de Roles Esenciales (Prioridad Alta)
+            # Se recorren todas las clases asignando los docentes principales.
+            for i, clase in enumerate(gestorDatos.listaClases):
+                gen = cromosomaActual.genes[i]
+                gen.idFacilitador1 = _girarRuleta(och, gestorDatos, clase, gen, cromosomaActual, "F1")
+                gen.idFacilitador2 = _girarRuleta(och, gestorDatos, clase, gen, cromosomaActual, "F2")
+                
+                # Solo asignamos PEE si la lógica de tipos (2 o 4) lo requiere
+                if clase.tipoDeClase in [2, 4]:
+                    gen.idProfesorEducacionEspecial = _girarRuleta(och, gestorDatos, clase, gen, cromosomaActual, "PEE")
+            
+            # PASO 2: Asignación de Roles Complementarios (Prioridad Baja)
+            # Solo se intenta asignar FC si el facilitador tiene horas remanentes.
+            for i, clase in enumerate(gestorDatos.listaClases):
+                gen = cromosomaActual.genes[i]
+                # Se asigna el FC; el filtro interno de horas en _girarRuleta evitará exceder el máximo.
+                gen.idFacilitadorComplementario = _girarRuleta(och, gestorDatos, clase, gen, cromosomaActual, "FC")
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
             
             poblacionDelGrupo.append(cromosomaActual)
             idHormigaGlobal += 1
@@ -381,10 +458,18 @@ def operadorCruza(poblacion_intermedia, cantidad_elite, prob_cruza=0.90):
             
     return poblacion_cruzada
 
+<<<<<<< HEAD
 def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutacion=0.05):
     """
     Aplica alteraciones genéticas aleatorias sobre las matrices generadas, 
     garantizando la integridad referencial de los índices de facilitadores.
+=======
+def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutacion, pesos_config):
+    """
+    Aplica alteraciones genéticas aleatorias sobre las matrices.
+    Utiliza una distribución de probabilidad ponderada para elegir el rol a mutar
+    basado en la configuración de la interfaz de usuario.
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
     """
     num_individuos, num_clases, num_roles = poblacion_cruzada.shape
     matriz_es_pee = datos_numpy["es_pee"]
@@ -399,6 +484,7 @@ def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutaci
         clases_a_mutar = np.where(mascara_mutacion[idx_indiv_relativo])[0]
         
         for clase_idx in clases_a_mutar:
+<<<<<<< HEAD
             roles_activos = np.where(poblacion_cruzada[idx_real, clase_idx] != -1)[0]
             if len(roles_activos) == 0: continue
             
@@ -408,6 +494,25 @@ def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutaci
                 if len(ids_pee) > 0:
                     poblacion_cruzada[idx_real, clase_idx, rol_a_mutar] = np.random.choice(ids_pee)
             else:
+=======
+            # Identificamos los roles que actualmente poseen una asignación (distintos de -1)
+            roles_activos = np.where(poblacion_cruzada[idx_real, clase_idx] != -1)[0]
+            if len(roles_activos) == 0: continue
+            
+            # Filtramos y normalizamos los pesos de la interfaz para los roles activos de esta clase
+            pesos_actuales = np.array([pesos_config[r] for r in roles_activos])
+            if np.sum(pesos_actuales) > 0:
+                prob_normalizada = pesos_actuales / np.sum(pesos_actuales)
+                rol_a_mutar = np.random.choice(roles_activos, p=prob_normalizada)
+            else:
+                rol_a_mutar = np.random.choice(roles_activos)
+            
+            # Ejecución del cambio de alelo (ID de facilitador)
+            if rol_a_mutar == 3: # Rol Profesor de Educación Especial
+                if len(ids_pee) > 0:
+                    poblacion_cruzada[idx_real, clase_idx, rol_a_mutar] = np.random.choice(ids_pee)
+            else: # Roles F1, F2 o FC
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
                 if len(ids_regulares) > 0:
                     poblacion_cruzada[idx_real, clase_idx, rol_a_mutar] = np.random.choice(ids_regulares)
                     
@@ -427,6 +532,43 @@ def algoritmoAG(configAG):
     configAG.tiempo_inicio = time.time()
     configAG.tiempo_ejecucion_final = 0.0
 
+<<<<<<< HEAD
+=======
+
+def mostrarReportePenalizaciones(tensor_cromosoma, datos_numpy):
+    """
+    Realiza una evaluación detallada de las penalizaciones para diagnosticar 
+    cuáles son las restricciones que más afectan la función de aptitud.
+    """
+    p1 = FR1(tensor_cromosoma, datos_numpy)
+    p2 = FR2(tensor_cromosoma, datos_numpy)
+    p3 = FR3(tensor_cromosoma, datos_numpy)
+    p4 = FR4(tensor_cromosoma, datos_numpy)
+    p5 = FR5(tensor_cromosoma, datos_numpy)
+    p6 = FR6(tensor_cromosoma, datos_numpy)
+    p7 = FR7(tensor_cromosoma, datos_numpy)
+    p8 = FR8(tensor_cromosoma, datos_numpy)
+    
+    total = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8
+    
+    print("\n" + "="*45)
+    print(" REPORTE TÉCNICO DE PENALIZACIONES (CAMPEÓN)")
+    print("="*45)
+    print(f"FR1 (Conflictos de Simultaneidad): {p1}")
+    print(f"FR2 (Disponibilidad Horaria):     {p2}")
+    print(f"FR3 (Cumplimiento Contractual):   {p3}")
+    print(f"FR4 (Liderazgo en Sprints):       {p4}")
+    print(f"FR5 (Límite de Sprints):          {p5}")
+    print(f"FR6 (Asistencia de Especialista): {p6}")
+    print(f"FR7 (Pareja Pedagógica/Técnica):  {p7}")
+    print(f"FR8 (Competencias de Trayecto):   {p8}")
+    print("-" * 45)
+    print(f"SUMATORIA DE PENALIZACIONES:      {total}")
+    print(f"APTITUD CALCULADA:                {1.0 / (1.0 + total):.6f}")
+    print("="*45 + "\n")
+
+
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
 def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos):
     """
     Controlador principal. Mapea la población a tensores matriciales, evalúa,
@@ -468,6 +610,7 @@ def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos):
             break
             
         # Aplicación de operadores genéticos matriciales
+<<<<<<< HEAD
         pob_intermedia = operadorSeleccion(tensor_poblacion, aptitudes, elitismo, 
                                            configAG.seleccionTorneo, configAG.seleccionRuleta)
         
@@ -475,6 +618,34 @@ def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos):
         
         tensor_poblacion = operadorMutacion(pob_cruzada, datos_numpy, cantidad_elite, 
                                             prob_mutacion=configAG.probGeneralMutacion)
+=======
+        
+        # 1. SELECCIÓN (Conectada a la presión de la interfaz)
+        pob_intermedia = operadorSeleccion(tensor_poblacion, aptitudes, elitismo, 
+                                           configAG.seleccionTorneo, configAG.seleccionRuleta,
+                                           presion_selectiva=configAG.presionSelectiva)
+        
+        # 2. CRUZA (Conectada a los puntos y probabilidad de la interfaz)
+        pob_cruzada = operadorCruza(pob_intermedia, cantidad_elite, 
+                                    puntos_cruza=configAG.puntosCruza, 
+                                    prob_cruza=configAG.probabilidadCruza)
+        
+        # 3. MUTACIÓN (Conectada a los pesos de la interfaz)
+        pesos_mutacion = [
+            configAG.probMutacionF1,  # Peso para Facilitador 1
+            configAG.probMutacionF2,  # Peso para Facilitador 2
+            configAG.probMutacionFC,  # Peso para Facilitador Complementario
+            configAG.probMutacionPEE # Peso para Prof. Educación Especial
+        ]
+
+        tensor_poblacion = operadorMutacion(
+            pob_cruzada, 
+            datos_numpy, 
+            cantidad_elite, 
+            configAG.probGeneralMutacion, 
+            pesos_mutacion
+        )
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
         
         # Evaluación de la descendencia
         for i in range(num_individuos):
@@ -491,6 +662,12 @@ def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos):
     idx_mejor = np.argmax(aptitudes)
     matriz_campeona = tensor_poblacion[idx_mejor]
     
+<<<<<<< HEAD
+=======
+    # Generar reporte detallado en la consola antes de retornar
+    mostrarReportePenalizaciones(matriz_campeona, datos_numpy)
+
+>>>>>>> 9643fe3d01205a86b689800ebd90e15a512c4eb3
     modelo_cromosoma = poblacion_objetos[0]
     cromosoma_ganador = decodificarCromosomaOptimo(matriz_campeona, modelo_cromosoma, datos_numpy)
     cromosoma_ganador.funcionAptitud = aptitudes[idx_mejor]
