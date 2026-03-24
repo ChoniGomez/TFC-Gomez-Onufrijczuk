@@ -199,7 +199,7 @@ def FR6(cromosoma, gestorDatos):
     """
     vector_tipo_clase = gestorDatos["tipo_clase"]
     
-    necesita_pee = (vector_tipo_clase == 3) | (vector_tipo_clase == 4)
+    necesita_pee = (vector_tipo_clase == 2) | (vector_tipo_clase == 4)
     asignaciones_pee = cromosoma[:, 3] # La columna 3 corresponde al rol PEE
     
     # Evaluación lógica: Verificación de carencia (-1) sobre clases que exigen PEE obligatoriamente.

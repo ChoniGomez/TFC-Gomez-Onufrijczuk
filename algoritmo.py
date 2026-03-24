@@ -102,9 +102,29 @@ def _girarRuleta(och, gestorDatos, clase, horarios_hormiga, workload_hormiga, ro
 
     # Si no hay candidatos atractivos, se elige uno al azar que cumpla el perfil.
     if sumaAtractivos == 0.0:
-        validos = [f for f in candidatos if (f.tipoFacilitador.idTipo == 4) == esPee]
-        if validos: return random.choice(validos).idFacilitador
-        return None
+        # --- INICIO DE FALLBACK MEJORADO ---
+        # Si no hay candidatos "perfectos", se intenta asignar uno que al menos no genere un choque de horario.
+        candidatos_sin_choque = []
+        for facilitador in candidatos:
+            idCandidato = facilitador.idFacilitador
+            tipoCandidato = facilitador.tipoFacilitador.idTipo
+            
+            if (esPee and tipoCandidato != 4) or (not esPee and tipoCandidato == 4): continue
+
+            tieneChoque = False
+            if idCandidato in horarios_hormiga and modulos_clase and dia_num != -1:
+                timeline_candidato = horarios_hormiga[idCandidato]
+                inicio_clase = min(modulos_clase)
+                fin_clase = max(modulos_clase)
+                if np.any(timeline_candidato[dia_num, inicio_clase:fin_clase+1] > 0):
+                    tieneChoque = True
+            
+            if not tieneChoque:
+                candidatos_sin_choque.append(facilitador)
+
+        if candidatos_sin_choque:
+            return random.choice(candidatos_sin_choque).idFacilitador
+        return None # Si todos los candidatos posibles generan choque, no se asigna a nadie.
 
     # Gira la ruleta para seleccionar un candidato basado en su atractivo.
     r = random.uniform(0.0, 1.0) * sumaAtractivos
