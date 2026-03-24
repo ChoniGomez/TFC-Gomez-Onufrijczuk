@@ -12,28 +12,26 @@ from algoritmo import (algoritmoOCH, generarPoblacionInicial, evaluarFuncionApti
                        algoritmoAG, ejecutarCicloGenetico)
 
 class ConfiguracionAG:
-    """Estructura para el encapsulamiento de los parámetros del Algoritmo Genético."""
+    """Clase para guardar los parámetros del Algoritmo Genético."""
     def __init__(self):
         pass
 
 
 class PantallaInicio(tk.Frame):
     """
-    Vista inicial de la aplicación.
-    Provee el punto de entrada principal al sistema de asignación.
+    Pantalla de bienvenida.
     """
     def __init__(self, parent, controlador):
         super().__init__(parent)
         tk.Label(self, text="TFC Gomez - Onufrijczuk", font=("Arial", 20, "bold"), pady=50).pack()
-        
+
         tk.Button(self, text="INICIAR", width=20, height=2, bg="#4CAF50", fg="white", font=("Arial", 12, "bold"),
                   command=lambda: controlador.mostrarPantalla(PantallaCarga)).pack()
 
 
 class PantallaCarga(tk.Frame):
     """
-    Vista de gestión de datos.
-    Permite la selección y carga en memoria de los archivos CSV requeridos.
+    Pantalla para cargar los archivos CSV.
     """
     def __init__(self, parent, controlador):
         super().__init__(parent)
@@ -42,7 +40,7 @@ class PantallaCarga(tk.Frame):
 
         tk.Label(self, text="Carga de Archivos CSV", font=("Arial", 16, "bold"), pady=20).pack()
 
-        # Definición de los módulos de datos requeridos para la ejecución
+        # Archivos necesarios
         opciones = [
             ("Cargar Facilitadores", "facilitadores"),
             ("Cargar Trayectos", "trayectos"),
@@ -51,7 +49,7 @@ class PantallaCarga(tk.Frame):
             ("Cargar horarios de clases", "horarios_clases")
         ]
 
-        # Contenedor central para la alineación de los elementos de carga
+        # Frame para alinear los botones
         frameCentral = tk.Frame(self)
         frameCentral.pack()
 
@@ -64,7 +62,7 @@ class PantallaCarga(tk.Frame):
                             command=lambda c=clave: self.seleccionarArchivo(c))
             btn.pack(side="left", ipady=5)
 
-            # Verificación del estado de carga en el gestor de datos global
+            # Revisa si el archivo ya se cargó
             cargado = self.controlador.gestor.tieneDatos(clave)
             
             estadoInicial = "✅" if cargado else "❌"
@@ -75,7 +73,7 @@ class PantallaCarga(tk.Frame):
             
             self.checksVisuales[clave] = lblCheck
 
-        # Botón de navegación hacia la vista de configuración del algoritmo
+        # Botón para ir a la siguiente pantalla
         btnSiguiente = tk.Button(self, text="Siguiente →", width=15, bg="#2196F3", fg="white",
                                  font=("Arial", 12, "bold"), cursor="hand2",
                                  command=self.irAAlgoritmo)
@@ -83,8 +81,7 @@ class PantallaCarga(tk.Frame):
 
     def seleccionarArchivo(self, clave):
         """
-        Abre un cuadro de diálogo para la selección del archivo y delega 
-        la persistencia en memoria al gestor de datos.
+        Abre el diálogo para seleccionar un archivo y lo manda a cargar.
         """
         ruta = filedialog.askopenfilename(filetypes=[("Archivos CSV", "*.csv")])
         if ruta:
@@ -96,7 +93,7 @@ class PantallaCarga(tk.Frame):
 
     def irAAlgoritmo(self):
         """
-        Validación de requisitos previos antes de inicializar la vista del algoritmo.
+        Verifica que todos los archivos estén cargados antes de continuar.
         """
         if not self.controlador.gestor.estanDatosListos():
             messagebox.showwarning("Atención", "Es necesario cargar todos los archivos CSV para continuar.")
@@ -106,7 +103,7 @@ class PantallaCarga(tk.Frame):
 
 class PantallaAlgoritmo(tk.Frame):
     """
-    Vista principal de ejecución y monitoreo del Algoritmo de Optimización.
+    Pantalla principal para configurar y ejecutar el algoritmo.
     """
     def __init__(self, parent, controlador):
         super().__init__(parent)
@@ -121,7 +118,7 @@ class PantallaAlgoritmo(tk.Frame):
 
     def crearPanelIzquierdo(self):
         """
-        Inicializa y renderiza el panel de gráficos estadísticos de evolución.
+        Crea el panel del gráfico de evolución.
         """
         frameIzq = tk.Frame(self, padx=10, pady=10)
         frameIzq.grid(row=0, column=0, sticky="nsew")
@@ -132,7 +129,7 @@ class PantallaAlgoritmo(tk.Frame):
         self.fig = Figure(figsize=(5, 4), dpi=100)
         self.ax = self.fig.add_subplot(111)
         
-        # Configuración inicial del área de graficación (estado de espera).
+        # Configura el gráfico antes de la ejecución.
         self.ax.set_title('Evolución de la Población', fontsize=10, fontweight='bold')
         self.ax.set_xlabel('Generaciones', fontweight='bold')
         self.ax.set_ylabel('Función de Aptitud', fontweight='bold')
@@ -150,8 +147,7 @@ class PantallaAlgoritmo(tk.Frame):
 
     def crearPanelDerecho(self):
         """
-        Inicializa y renderiza el panel de configuración de parámetros del algoritmo 
-        y las métricas de ejecución.
+        Crea el panel de configuración y resultados.
         """
         frameDer = tk.Frame(self, padx=10, pady=10)
         frameDer.grid(row=0, column=1, sticky="nsew")
@@ -360,17 +356,16 @@ class PantallaAlgoritmo(tk.Frame):
 
     def ejecutarAlgoritmo(self):
         """
-        Orquesta la captura de parámetros, la inicialización espacial (OCH),
-        la evolución poblacional (AG) y la actualización asíncrona de la vista.
+        Orquesta todo el proceso: captura parámetros, ejecuta OCH y AG, y actualiza la interfaz.
         """
         try:
             # ==========================================
-            # FASE 1: CAPTURA DE PARÁMETROS
+            # FASE 1: CAPTURAR PARÁMETROS DE LA INTERFAZ
             # ==========================================
             print("[SISTEMA] Evaluando parámetros de configuración gráfica...")
             
             # 1.1 Parámetros OCH
-            configOCH = OCH(
+            configOCH = OCH( # noqa
                 idOCH=1, 
                 numeroHormigas=int(self.entNumHormigas.get()), 
                 feromonaInicial=float(self.entFeromonaInicial.get()), 
@@ -402,7 +397,7 @@ class PantallaAlgoritmo(tk.Frame):
             configAG.probMutacionPEE = float(self.entPfe.get())
 
             # ==========================================
-            # FASE 1.5: GUARDAR DATOS EN ARCHIVO .TXT
+            # FASE 2: GUARDAR CONFIGURACIÓN EN LOG
             # ==========================================
             carpeta_logs = "logs_ejecucion"
             if not os.path.exists(carpeta_logs):
@@ -441,7 +436,7 @@ class PantallaAlgoritmo(tk.Frame):
             print(f"[SISTEMA] Registro de configuración guardado en {nombre_archivo}.")
 
             # ==========================================
-            # FASE 2: COLONIA DE HORMIGAS (Población Inicial)
+            # FASE 3: EJECUTAR OCH PARA POBLACIÓN INICIAL
             # ==========================================
             print("[SISTEMA] Desplegando Matriz global de Feromonas OCH.")
             algoritmoOCH(configOCH, self.controlador.gestor)
@@ -455,7 +450,7 @@ class PantallaAlgoritmo(tk.Frame):
             print(f"[SISTEMA] Población inicial conformada por {len(poblacion_inicial)} individuos estocásticos.")
 
             # ==========================================
-            # FASE 3: EVOLUCIÓN GENÉTICA
+            # FASE 4: EJECUTAR ALGORITMO GENÉTICO
             # ==========================================
             print("[SISTEMA] Parametrizando motor de inferencia genética.")
             algoritmoAG(configAG) 
@@ -466,7 +461,7 @@ class PantallaAlgoritmo(tk.Frame):
             campeon = poblacion_final[0]
 
             # ==========================================
-            # FASE 4: ACTUALIZACIÓN DE LA INTERFAZ
+            # FASE 5: MOSTRAR RESULTADOS
             # ==========================================
             print("[SISTEMA] Proceso evolutivo concluido. Renderizando métricas resultantes.")
             

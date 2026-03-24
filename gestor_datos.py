@@ -14,8 +14,7 @@ class GestorDatos:
 
     def cargarCsv(self, clave, rutaArchivo):
         """
-        Procesa la lectura de archivos CSV según la clave proporcionada
-        y genera las instancias correspondientes en memoria aplicando camelCase.
+        Lee un archivo CSV y carga los datos en memoria como objetos.
         """
         try:
             # ----------------------------------------------------
@@ -46,7 +45,7 @@ class GestorDatos:
                     )
                     self.listaFacilitadores.append(nuevoFacilitador)
                 
-                print(f"[SISTEMA] Procesamiento exitoso: {len(self.listaFacilitadores)} instancias de Facilitador cargadas.")
+                print(f"[SISTEMA] Carga de facilitadores completa: {len(self.listaFacilitadores)}.")
                 return True, "Carga completada"
 
             # ----------------------------------------------------
@@ -62,20 +61,20 @@ class GestorDatos:
                 }
                 
                 for indice, fila in df.iterrows():
-                    nombreTipo = str(fila['Tipo']).strip()
+                    nombreTipo = str(fila['Tipo']).strip().title()
                     idAsignado = idsPorTipo.get(nombreTipo, 99)
                     
                     objTipoTrayecto = TipoTrayecto(idTipo=idAsignado, nombre=nombreTipo)
                     
                     nuevoTrayecto = Trayecto(
                         idTrayecto=fila['ID'],
-                        nombre=fila['Trayecto'],
-                        nivel=fila['Nivel'],
+                        nombre=str(fila['Trayecto']).strip().lower(),
+                        nivel=str(fila['Nivel']).strip().lower(),
                         tipoTrayecto=objTipoTrayecto
                     )
                     self.listaTrayectos.append(nuevoTrayecto)
 
-                print(f"[SISTEMA] Procesamiento exitoso: {len(self.listaTrayectos)} instancias de Trayecto cargadas.")
+                print(f"[SISTEMA] Carga de trayectos completa: {len(self.listaTrayectos)}.")
                 return True, "Carga completada"
 
             # ----------------------------------------------------
@@ -109,7 +108,7 @@ class GestorDatos:
                         
                         facilitador.disponibilidadTrayecto = nuevaDisponibilidad
 
-                print(f"[SISTEMA] Generación de relaciones: {vinculacionesHechas} vínculos Facilitador-Trayecto inicializados.")
+                print(f"[SISTEMA] Vínculos Facilitador-Trayecto creados: {vinculacionesHechas}.")
                 return True, "Carga completada"
 
             # ----------------------------------------------------
@@ -121,7 +120,7 @@ class GestorDatos:
 
                 df = pd.read_csv(rutaArchivo)
                 
-                # Transformación de representación horaria en texto a intervalos discretos de 15 minutos.
+                # Convierte las horas (ej: '8:00') a módulos de 15 minutos.
                 mapaHoras = {
                     '8:00': [1,2,3,4],       '9:00': [5,6,7,8],       '10:00': [9,10,11,12],
                     '11:00': [13,14,15,16],  '12:00': [17,18,19,20],  '13:00': [21,22,23,24],
@@ -157,7 +156,7 @@ class GestorDatos:
                                     dispDelDia.agregarModulo(nuevoModulo)
                                     modulosCreados += 1
 
-                print(f"[SISTEMA] Instanciación modular: {modulosCreados} franjas horarias de disponibilidad creadas.")
+                print(f"[SISTEMA] Módulos de disponibilidad creados: {modulosCreados}.")
                 return True, "Carga completada"
 
             # ----------------------------------------------------
@@ -180,7 +179,7 @@ class GestorDatos:
 
                 for indice, fila in df.iterrows():
                     # Procesamiento de Salón
-                    nombreSalon = str(fila['Salon']).strip()
+                    nombreSalon = str(fila['Salon']).strip().upper()
                     if nombreSalon.lower() == "nan": nombreSalon = "SIN ASIGNAR"
                     
                     salon = next((s for s in self.listaSalones if s.nombre == nombreSalon), None)
@@ -190,7 +189,7 @@ class GestorDatos:
                         self.listaSalones.append(salon)
 
                     # Procesamiento de Horario
-                    dia = str(fila['Dia']).strip()
+                    dia = str(fila['Dia']).strip().capitalize()
                     horaInicio = str(fila['Hora Inicio']).strip()
                     horaFin = str(fila['Hora Fin']).strip()
                     
@@ -208,28 +207,27 @@ class GestorDatos:
                     self.listaHorariosClases.append(horarioClase)
 
                     # Procesamiento de Trayecto
-                    nombreTrayecto = str(fila['Trayecto']).strip()
-                    nivelTrayecto = str(fila['Nivel']).strip()
+                    nombreTrayecto = str(fila['Trayecto']).strip().lower()
+                    nivelTrayecto = str(fila['Nivel']).strip().lower()
                     
-                    trayecto = next((t for t in self.listaTrayectos if t.nombre == nombreTrayecto and t.nivel == nivelTrayecto), None)
+                    trayecto = next((t for t in self.listaTrayectos if t.nombre == nombreTrayecto and t.nivel == nivelTrayecto), None) # noqa
                     if not trayecto:
                         trayecto = next((t for t in self.listaTrayectos if t.nombre == nombreTrayecto), None)
 
-                    # Cálculo del tipo de clase (1 a 5) basado en los requisitos del TFC
+                    # Define el tipo de clase (1-5) según las reglas.
                     tipoStr = str(fila['Tipo']).strip().upper()
                     necesitaProfEspecial = str(fila['Prof Educacion Especial']).strip().upper() == "SI"
                     
-                    trayectosTpt = ["TECNOKIDS", "PEQUEBOT", "TRENDKIDS"]
-                    nombreTrayectoUpper = nombreTrayecto.upper()
+                    trayectosTpt = ["tecnokids", "pequebot", "trendkids"]
                     
                     if tipoStr == "SPRINT":
                         tipoClase = 5
-                    elif nombreTrayectoUpper in trayectosTpt:
+                    elif nombreTrayecto in trayectosTpt:
                         tipoClase = 2 if necesitaProfEspecial else 1
                     else:
                         tipoClase = 4 if necesitaProfEspecial else 3
 
-                    # Instanciación de la Clase
+                    # Crea la instancia de la Clase.
                     idClase = len(self.listaClases) + 1
                     nuevaClase = Clase(
                         idClase=idClase,
@@ -240,16 +238,16 @@ class GestorDatos:
                     )
                     self.listaClases.append(nuevaClase)
 
-                print(f"[SISTEMA] Procesamiento exitoso: {len(self.listaClases)} instancias de Clase estructuradas.")
+                print(f"[SISTEMA] Carga de clases completa: {len(self.listaClases)}.")
                 return True, "Carga completada"
 
-            return False, "Error: Clave de archivo no reconocida por el sistema."
+            return False, "Error: Clave de archivo no reconocida."
             
         except Exception as e:
             return False, f"Error durante la lectura del archivo: {e}"
 
     def estanDatosListos(self):
-        """Verifica que todos los conjuntos de datos necesarios estén cargados."""
+        """Verifica si todos los datos necesarios están cargados."""
         return (len(self.listaFacilitadores) > 0 and 
                 len(self.listaTrayectos) > 0 and 
                 any(f.disponibilidadTrayecto is not None for f in self.listaFacilitadores) and
@@ -257,7 +255,7 @@ class GestorDatos:
                 len(self.listaClases) > 0)
 
     def tieneDatos(self, clave):
-        """Devuelve el estado de carga de una entidad específica."""
+        """Verifica si un tipo de dato específico ya fue cargado."""
         if clave == "facilitadores":
             return len(self.listaFacilitadores) > 0
         elif clave == "trayectos":

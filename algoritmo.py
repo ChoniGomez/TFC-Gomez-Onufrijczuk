@@ -13,9 +13,8 @@ from restricciones import FR1, FR2, FR3, FR4, FR5, FR6, FR7, FR8
 
 def algoritmoOCH(och, gestorDatos):
     """
-    Inicializa la matriz de feromonas global del algoritmo de Optimización 
-    por Colonia de Hormigas (OCH).
-    Asigna el valor inicial a todas las aristas posibles entre clases y facilitadores.
+    Inicializa la matriz de feromonas con un valor base para todas las
+    posibles asignaciones (clase, facilitador).
     """
     if not isinstance(och.feromonaGlobal, dict):
         och.feromonaGlobal = {}
@@ -24,19 +23,18 @@ def algoritmoOCH(och, gestorDatos):
         for facilitador in gestorDatos.listaFacilitadores:
             och.feromonaGlobal[(clase.idClase, facilitador.idFacilitador)] = och.feromonaInicial
 
-def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
+def _girarRuleta(och, gestorDatos, clase, horarios_hormiga, workload_hormiga, rol, mapa_dias):
     """
-    Función estocástica de selección basada en probabilidades (Ruleta).
-    Aplica filtros de restricciones duras de manera anticipada para limitar 
-    el espacio de búsqueda y reducir la complejidad combinatoria.
+    Selecciona un facilitador para una clase usando una ruleta.
+    Aplica filtros previos (restricciones duras) para optimizar la búsqueda.
     """
     candidatos = gestorDatos.listaFacilitadores
     atractivos = {}
     sumaAtractivos = 0.0
     esPee = (rol == "PEE")
     
-    diaClase = clase.horarioDeClase.dia
-    modulosClaseActual = set(m.idModuloDeHorario for m in clase.horarioDeClase.modulos)
+    dia_num = mapa_dias.get(clase.horarioDeClase.dia.strip().lower(), -1)
+    modulos_clase = [m.numeroModulo for m in clase.horarioDeClase.modulos]
     
     for facilitador in candidatos:
         idCandidato = facilitador.idFacilitador
@@ -46,7 +44,7 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
         if esPee and tipoCandidato != 4: continue
         if not esPee and tipoCandidato == 4: continue
 
-        # Validación de competencias formativas (Trayecto)
+        # Filtro: el facilitador debe ser competente para el trayecto.
         esCompetente = False
         if clase.trayecto is None:
             esCompetente = True
@@ -57,34 +55,44 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
                     break
         if not esCompetente: continue
         
-        # Validación de disponibilidad horaria contractual
+        # Filtro: el facilitador debe tener disponibilidad horaria para la clase.
         estaDisponible = False
         for disp in facilitador.disponibilidadesHorarias:
-            if disp.dia == diaClase:
+            if disp.dia == clase.horarioDeClase.dia:
                 modulosFacilitador = set(m.idModuloDeHorario for m in disp.modulos)
+                modulosClaseActual = set(m.idModuloDeHorario for m in clase.horarioDeClase.modulos)
                 if modulosClaseActual.issubset(modulosFacilitador):
                     estaDisponible = True
                     break
         if not estaDisponible: continue
         
-        # Validación de solapamiento horario con asignaciones previas en el cromosoma
+        # Filtro: el facilitador no debe tener otra clase en el mismo horario.
         tieneChoque = False
-        for genAnterior in cromosomaActual.genes:
-            if genAnterior.idGen == clase.idClase: continue 
-            
-            if idCandidato in [genAnterior.idFacilitador1, genAnterior.idFacilitador2, 
-                               genAnterior.idFacilitadorComplementario, genAnterior.idProfesorEducacionEspecial]:
-                
-                claseAnterior = next((c for c in gestorDatos.listaClases if c.idClase == genAnterior.idGen), None)
-                if claseAnterior and claseAnterior.horarioDeClase.dia == diaClase:
-                    modulosAnteriores = set(m.idModuloDeHorario for m in claseAnterior.horarioDeClase.modulos)
-                    if modulosClaseActual.intersection(modulosAnteriores):
-                        tieneChoque = True
-                        break
+        if idCandidato in horarios_hormiga and modulos_clase and dia_num != -1:
+            timeline_candidato = horarios_hormiga[idCandidato]
+            inicio_clase = min(modulos_clase)
+            fin_clase = max(modulos_clase)
+            if np.any(timeline_candidato[dia_num, inicio_clase:fin_clase+1] > 0):
+                tieneChoque = True
         if tieneChoque: continue 
+        
+        # Filtro: la asignación no debe exceder las horas de contrato del facilitador.
+        carga_actual_modulos = workload_hormiga.get(idCandidato, 0)
+        duracion_clase_modulos = len(modulos_clase)
+        max_modulos_contrato = facilitador.cantidadHorasCumplir * 4
+        
+        if max_modulos_contrato > 0 and (carga_actual_modulos + duracion_clase_modulos) > max_modulos_contrato:
+            continue
 
-        # Cálculo de atractivo heurístico
-        eta = 1.0 
+        # Heurística: se priorizan facilitadores que aún no han cumplido su carga mínima.
+        min_modulos_contrato = (facilitador.cantidadHorasCumplir * 4) * 0.8
+        if min_modulos_contrato > 0 and carga_actual_modulos >= min_modulos_contrato:
+            continue
+            
+        # Cálculo de atractivo: combina la feromona y una heurística.
+        # La heurística prefiere a facilitadores con menor carga horaria actual.
+        eta = 1.0 / (1.0 + carga_actual_modulos)
+
         tau = och.feromonaGlobal.get((clase.idClase, idCandidato), och.feromonaInicial)
         atractivo = (tau ** och.importanciaFeromona) * (eta ** och.importanciaHeuristica)
         
@@ -92,13 +100,13 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
             atractivos[idCandidato] = atractivo
             sumaAtractivos += atractivo
 
-    # Resolución en caso de conjunto de candidatos vacío
+    # Si no hay candidatos atractivos, se elige uno al azar que cumpla el perfil.
     if sumaAtractivos == 0.0:
         validos = [f for f in candidatos if (f.tipoFacilitador.idTipo == 4) == esPee]
         if validos: return random.choice(validos).idFacilitador
         return None
 
-    # Selección mediante ruleta proporcional
+    # Gira la ruleta para seleccionar un candidato basado en su atractivo.
     r = random.uniform(0.0, 1.0) * sumaAtractivos
     intervaloAcumulado = 0.0
     for idCandidato, valorAtractivo in atractivos.items():
@@ -109,31 +117,62 @@ def _girarRuleta(och, gestorDatos, clase, genActual, cromosomaActual, rol):
 
 def generarPoblacionInicial(och, gestorDatos):
     """
-    Ejecuta el ciclo constructivo de la Colonia de Hormigas.
-    Retorna una lista de objetos Cromosoma que representan soluciones factibles iniciales.
+    Crea la población inicial de soluciones usando el algoritmo de
+    Colonia de Hormigas.
     """
     poblacionTotal = []
     grupos = och.grupoHormigas if och.grupoHormigas > 0 else 1
     hormigasPorGrupo = och.numeroHormigas
     idHormigaGlobal = 1
     
+    # --- Setup para optimización de chequeo de choques ---
+    mapa_dias = {
+        "lunes": 0, "martes": 1, "miercoles": 2, "miércoles": 2, 
+        "jueves": 3, "viernes": 4, "sabado": 5, "sábado": 5, "domingo": 6
+    }
+    modulos_en_clases = [int(m.numeroModulo) for c in gestorDatos.listaClases for m in c.horarioDeClase.modulos]
+    max_id_modulo = max(modulos_en_clases + [0])
+    # --- Fin Setup ---
+
     for numGrupo in range(grupos):
         poblacionDelGrupo = []
         for _ in range(hormigasPorGrupo):
             hormiga = Hormiga(idHormiga=idHormigaGlobal, algoritmoOCH=och, poblacion=None)
             cromosomaActual = Cromosoma(idCromosoma=idHormigaGlobal, funcionAptitud=0.0, ordenCromosoma=idHormigaGlobal, poblacion=None)
+            horarios_hormiga = {} # Timeline para esta hormiga/solución
+            workload_hormiga = {} # Carga de trabajo (en bloques) para esta hormiga
             
             for clase in gestorDatos.listaClases:
                 genNuevo = Gen(idGen=clase.idClase, idFacilitador1=None, idFacilitador2=None, 
                                idFacilitadorComplementario=None, idProfesorEducacionEspecial=None, 
                                evaluar=True, cromosoma=cromosomaActual)
                 cromosomaActual.agregarGen(genNuevo)
-                genNuevo.idFacilitador1 = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "F1")
-                genNuevo.idFacilitador2 = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "F2")
-                genNuevo.idFacilitadorComplementario = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "FC")
-                
+
+                def asignar_y_actualizar(rol):
+                    """Función auxiliar para asignar un facilitador y actualizar su timeline."""
+                    id_fac = _girarRuleta(och, gestorDatos, clase, horarios_hormiga, workload_hormiga, rol, mapa_dias)
+                    if id_fac is not None:
+                        if id_fac not in horarios_hormiga:
+                            horarios_hormiga[id_fac] = np.zeros((7, max_id_modulo + 1), dtype=np.int8)
+                        if id_fac not in workload_hormiga:
+                            workload_hormiga[id_fac] = 0
+                        
+                        dia_num = mapa_dias.get(clase.horarioDeClase.dia.strip().lower(), -1)
+                        if dia_num != -1:
+                            modulos_clase = [m.numeroModulo for m in clase.horarioDeClase.modulos]
+                            if modulos_clase:
+                                workload_hormiga[id_fac] += len(modulos_clase)
+                                inicio = min(modulos_clase)
+                                fin = max(modulos_clase)
+                                horarios_hormiga[id_fac][dia_num, inicio:fin+1] += 1
+                    return id_fac
+
+                genNuevo.idFacilitador1 = asignar_y_actualizar("F1")
+                genNuevo.idFacilitador2 = asignar_y_actualizar("F2")
+                genNuevo.idFacilitadorComplementario = asignar_y_actualizar("FC")
+
                 if clase.tipoDeClase == 3 or clase.tipoDeClase == 4:
-                    genNuevo.idProfesorEducacionEspecial = _girarRuleta(och, gestorDatos, clase, genNuevo, cromosomaActual, "PEE")
+                    genNuevo.idProfesorEducacionEspecial = asignar_y_actualizar("PEE")
             
             poblacionDelGrupo.append(cromosomaActual)
             idHormigaGlobal += 1
@@ -148,9 +187,8 @@ def generarPoblacionInicial(och, gestorDatos):
 
 def inicializarEntornoMatricial(gestorDatos):
     """
-    Genera estructuras de datos estáticas (Vectores y Matrices) a partir del 
-    modelo de objetos para permitir el procesamiento en álgebra lineal.
-    Retorna un diccionario con las estructuras optimizadas.
+    Convierte los datos de objetos a matrices y vectores de NumPy para un
+    cálculo más rápido y eficiente durante la evaluación de restricciones.
     """
     mapa_fac_id_a_idx = {fac.idFacilitador: idx for idx, fac in enumerate(gestorDatos.listaFacilitadores)}
     mapa_idx_a_fac_id = {idx: fac.idFacilitador for idx, fac in enumerate(gestorDatos.listaFacilitadores)}
@@ -169,18 +207,24 @@ def inicializarEntornoMatricial(gestorDatos):
     vector_es_pee = np.zeros(num_fac, dtype=int)
     vector_perfil_fac = np.zeros(num_fac, dtype=int)
     
-    # =====================================================================
-    # CÁLCULO DINÁMICO DE LÍMITES DIMENSIONALES 
-    # =====================================================================
-    # 1. Determinación del ID máximo correspondiente a los trayectos
+    # --- Cálculo de dimensiones para las matrices ---
+    # 1. ID máximo de trayectos
     max_id_trayecto = max([int(t.idTrayecto) for t in gestorDatos.listaTrayectos] + [0])
     
-    # 2. Determinación del ID máximo correspondiente a los módulos horarios
+    # 2. ID máximo de módulos horarios
     modulos_en_clases = [int(m.numeroModulo) for c in gestorDatos.listaClases for m in c.horarioDeClase.modulos]
     modulos_en_disp = [int(m.numeroModulo) for f in gestorDatos.listaFacilitadores for d in f.disponibilidadesHorarias for m in d.modulos]
     max_id_modulo = max(modulos_en_clases + modulos_en_disp + [0])
     
-    # Inicialización de matrices con dimensiones ajustadas (se añade offset por índice base 0)
+    # 3. Vector para mapear ID de trayecto a su tipo (1: Tradicional, 2: Propuesta)
+    vector_tipo_trayecto = np.zeros(max_id_trayecto + 1, dtype=int)
+    for trayecto in gestorDatos.listaTrayectos:
+        id_t = int(trayecto.idTrayecto)
+        tipo_t = int(trayecto.tipoTrayecto.idTipo)
+        if id_t < len(vector_tipo_trayecto):
+            vector_tipo_trayecto[id_t] = tipo_t
+            
+    # Inicialización de matrices con las dimensiones calculadas.
     matriz_disp_horaria = np.zeros((num_fac, 7, max_id_modulo + 1), dtype=int)
     matriz_conocimiento_trayecto = np.zeros((num_fac, max_id_trayecto + 1), dtype=int)
 
@@ -231,14 +275,15 @@ def inicializarEntornoMatricial(gestorDatos):
         "horas_max": vector_horas_max,
         "es_pee": vector_es_pee,
         "tipo_clase": vector_tipo_clase,
-        "perfil_fac": vector_perfil_fac
+        "perfil_fac": vector_perfil_fac,
+        "tipo_trayecto": vector_tipo_trayecto
     }
     return datos_numpy
 
 def codificarPoblacionMatricial(poblacion_objetos, datos_numpy):
     """
-    Convierte la lista de objetos Cromosoma en un tensor 3D de NumPy.
-    Dimensiones: [Num_Individuos, Num_Clases, 4_Roles].
+    Convierte la población (lista de objetos Cromosoma) a un tensor 3D de NumPy
+    para procesarlo eficientemente. Dimensiones: [Individuos, Clases, Roles].
     """
     mapa_clase_id_a_idx = datos_numpy["mapa_clase_id_a_idx"]
     mapa_fac_id_a_idx = datos_numpy["mapa_fac_id_a_idx"]
@@ -260,8 +305,8 @@ def codificarPoblacionMatricial(poblacion_objetos, datos_numpy):
 
 def decodificarCromosomaOptimo(tensor_ganador, modelo_cromosoma, datos_numpy):
     """
-    Reconstruye el objeto Cromosoma original a partir del tensor bidimensional 
-    que representa la mejor solución encontrada.
+    Convierte la mejor solución (matriz de NumPy) de vuelta a un objeto
+    Cromosoma para poder interpretar y guardar el resultado.
     """
     mapa_idx_a_fac_id = datos_numpy["mapa_idx_a_fac_id"]
     
@@ -284,9 +329,9 @@ def decodificarCromosomaOptimo(tensor_ganador, modelo_cromosoma, datos_numpy):
 
 def evaluarFuncionAptitud(tensor_cromosoma, datos_numpy):
     """
-    Calcula la función de aptitud (fitness) de un cromosoma evaluando
-    todas las restricciones (duras y blandas) mediante procesamiento tensorial.
-    Fórmula: f_fitness(Ck) = 1 / (1 + sumatoria_penalizaciones)
+    Calcula la aptitud (fitness) de una solución. Una aptitud más alta es mejor.
+    Se basa en la suma de todas las penalizaciones de las restricciones.
+    Fórmula: Aptitud = 1 / (1 + Suma de Penalizaciones)
     """
     total_penalizaciones = (
         FR1(tensor_cromosoma, datos_numpy) +
@@ -307,9 +352,8 @@ def evaluarFuncionAptitud(tensor_cromosoma, datos_numpy):
 
 def operadorSeleccion(tensor_poblacion, aptitudes, elitismo, torneo, ruleta):
     """
-    Aplica los métodos de selección (Elitismo, Torneo y Ruleta) sobre la población 
-    representada matricialmente.
-    Retorna el tensor correspondiente a la población intermedia.
+    Selecciona los individuos para la siguiente generación usando una combinación
+    de Elitismo, Torneo y Ruleta.
     """
     num_individuos = tensor_poblacion.shape[0]
     poblacion_intermedia = np.zeros_like(tensor_poblacion)
@@ -341,8 +385,8 @@ def operadorSeleccion(tensor_poblacion, aptitudes, elitismo, torneo, ruleta):
 
 def operadorCruza(poblacion_intermedia, cantidad_elite, prob_cruza=0.90, puntos_cruza=3):
     """
-    Aplica el operador de cruce multipunto mediante partición e intercambio 
-    de segmentos de matrices (Slicing).
+    Realiza el cruce entre padres para generar nuevos individuos (hijos),
+    combinando partes de sus cromosomas.
     """
     num_individuos, num_clases, num_roles = poblacion_intermedia.shape
     poblacion_cruzada = np.zeros_like(poblacion_intermedia)
@@ -384,11 +428,18 @@ def operadorCruza(poblacion_intermedia, cantidad_elite, prob_cruza=0.90, puntos_
 
 def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutacion=0.05, probs_mutacion=None):
     """
-    Aplica alteraciones genéticas aleatorias sobre las matrices generadas, 
-    garantizando la integridad referencial de los índices de facilitadores.
+    Introduce cambios aleatorios (mutaciones) en los individuos para mantener
+    la diversidad en la población y evitar estancamiento.
     """
     num_individuos, num_clases, num_roles = poblacion_cruzada.shape
+    
+    # Extracción de datos para validaciones
     matriz_es_pee = datos_numpy["es_pee"]
+    matriz_clases_req = datos_numpy["clases_req"]
+    matriz_disp_horaria = datos_numpy["disp_horaria"]
+    matriz_conocimiento_trayecto = datos_numpy["conocimiento_trayecto"]
+    vector_horas_max = datos_numpy["horas_max"]
+    duraciones = matriz_clases_req[:, 2] - matriz_clases_req[:, 1] + 1
     
     ids_regulares = np.where(matriz_es_pee == 0)[0]
     ids_pee = np.where(matriz_es_pee == 1)[0]
@@ -399,27 +450,76 @@ def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutaci
         idx_real = cantidad_elite + idx_indiv_relativo
         clases_a_mutar = np.where(mascara_mutacion[idx_indiv_relativo])[0]
         
+        # Si hay clases para mutar en este individuo, pre-calculamos su carga horaria
+        if len(clases_a_mutar) > 0:
+            cromosoma_actual = poblacion_cruzada[idx_real]
+            workload_actual = np.bincount(
+                cromosoma_actual[cromosoma_actual != -1],
+                weights=np.broadcast_to(duraciones[:, np.newaxis], cromosoma_actual.shape)[cromosoma_actual != -1],
+                minlength=len(vector_horas_max)
+            )
+
         for clase_idx in clases_a_mutar:
             roles_activos = np.where(poblacion_cruzada[idx_real, clase_idx] != -1)[0]
             if len(roles_activos) == 0: continue
             
+            # Selección del rol a mutar
             if probs_mutacion is not None:
                 probs_activos = [probs_mutacion[r] for r in roles_activos]
                 suma_probs = sum(probs_activos)
-                if suma_probs > 0:
-                    probs_activos = [p / suma_probs for p in probs_activos]
-                    rol_a_mutar = np.random.choice(roles_activos, p=probs_activos)
-                else:
-                    rol_a_mutar = np.random.choice(roles_activos)
+                rol_a_mutar = np.random.choice(roles_activos, p=[p / suma_probs for p in probs_activos]) if suma_probs > 0 else np.random.choice(roles_activos)
             else:
                 rol_a_mutar = np.random.choice(roles_activos)
             
-            if rol_a_mutar == 3:
-                if len(ids_pee) > 0:
-                    poblacion_cruzada[idx_real, clase_idx, rol_a_mutar] = np.random.choice(ids_pee)
-            else:
-                if len(ids_regulares) > 0:
-                    poblacion_cruzada[idx_real, clase_idx, rol_a_mutar] = np.random.choice(ids_regulares)
+            # --- Mutación Inteligente: busca un reemplazo válido ---
+            original_fac_idx = poblacion_cruzada[idx_real, clase_idx, rol_a_mutar]
+            candidate_pool = ids_pee if rol_a_mutar == 3 else ids_regulares
+            if len(candidate_pool) == 0: continue
+
+            clase_dia, clase_inicio, clase_fin, clase_trayecto = matriz_clases_req[clase_idx]
+            clase_duracion = duraciones[clase_idx]
+            valid_candidates = []
+
+            for cand_idx in candidate_pool:
+                if cand_idx == original_fac_idx: continue
+
+                # FR8: Competencia
+                if clase_trayecto != -1 and matriz_conocimiento_trayecto[cand_idx, clase_trayecto] == 0: continue
+                # FR2: Disponibilidad
+                if np.sum(matriz_disp_horaria[cand_idx, clase_dia, clase_inicio:clase_fin+1]) < clase_duracion: continue
+                # FR3: Horas máximas
+                max_modulos_contrato = vector_horas_max[cand_idx] * 4
+                if max_modulos_contrato > 0 and (workload_actual[cand_idx] + clase_duracion) > max_modulos_contrato: continue
+                
+                # FR3: Descartar si ya cumplió el mínimo de horas (80%).
+                min_modulos_contrato = (vector_horas_max[cand_idx] * 4) * 0.8
+                if min_modulos_contrato > 0 and workload_actual[cand_idx] >= min_modulos_contrato: continue
+
+                # FR1: Choque de horario
+                tiene_choque = False
+                otras_clases_mask = np.any(cromosoma_actual == cand_idx, axis=1)
+                otras_clases_mask[clase_idx] = False
+                for otra_clase_idx in np.where(otras_clases_mask)[0]:
+                    if matriz_clases_req[otra_clase_idx, 0] == clase_dia and \
+                       matriz_clases_req[otra_clase_idx, 1] <= clase_fin and \
+                       matriz_clases_req[otra_clase_idx, 2] >= clase_inicio:
+                        tiene_choque = True
+                        break
+                if tiene_choque: continue
+                
+                valid_candidates.append(cand_idx)
+
+            if valid_candidates:
+                # La lista de candidatos ya está filtrada, por lo que se elige uno al azar.
+                nuevo_fac_idx = np.random.choice(valid_candidates)
+
+                poblacion_cruzada[idx_real, clase_idx, rol_a_mutar] = nuevo_fac_idx
+                
+                # Actualización de la carga para la siguiente mutación en el mismo individuo
+                workload_actual[nuevo_fac_idx] += clase_duracion
+                if original_fac_idx != -1:
+                    workload_actual[original_fac_idx] -= clase_duracion
+            # --- Fin de Mutación Inteligente ---
                     
     return poblacion_cruzada
 
@@ -429,7 +529,7 @@ def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutaci
 
 def algoritmoAG(configAG):
     """
-    Inicializa los parámetros de seguimiento de la ejecución evolutiva.
+    Prepara las variables para registrar el progreso del algoritmo genético.
     """
     configAG.historial_maximos = []
     configAG.historial_promedios = []
@@ -439,8 +539,8 @@ def algoritmoAG(configAG):
 
 def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos, log_file=None):
     """
-    Controlador principal. Mapea la población a tensores matriciales, evalúa,
-    aplica presiones evolutivas y decodifica el resultado óptimo al formato original.
+    Orquesta el ciclo principal del algoritmo genético: evalúa, selecciona,
+    cruza y muta la población a lo largo de las generaciones.
     """
     print("[SISTEMA] Inicializando entorno matricial de validación de restricciones.")
     datos_numpy = inicializarEntornoMatricial(gestorDatos)

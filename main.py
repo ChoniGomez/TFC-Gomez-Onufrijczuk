@@ -4,37 +4,33 @@ from gestor_datos import GestorDatos
 
 class AppPrincipal(tk.Tk):
     """
-    Clase principal de la aplicación que administra la ventana base, 
-    el contexto global de datos y el enrutamiento entre las pantallas.
+    Clase principal de la aplicación. Gestiona la ventana y el cambio entre pantallas.
     """
     def __init__(self):
         super().__init__()
         self.title("TFC Gomez - Onufrijczuk")
         
-        # ---------------------------------------------------------
-        # Configuración de dimensiones y centrado de ventana
-        # ---------------------------------------------------------
+        # --- Centra la ventana en la pantalla ---
         anchoVentana = 1100
         altoVentana = 790
 
-        # Obtención de la resolución primaria del hardware del usuario.
+        # Obtiene la resolución de la pantalla.
         anchoPantalla = self.winfo_screenwidth()
         altoPantalla = self.winfo_screenheight()
 
-        # Cálculo algebraico de las coordenadas X e Y para el centrado de la interfaz.
+        # Calcula las coordenadas para centrar la ventana.
         posicionX = int((anchoPantalla / 2) - (anchoVentana / 2))
         
-        # Se aplica un offset vertical (-40px) para compensar la barra de tareas del sistema operativo.
+        # Ajuste vertical para la barra de tareas.
         posicionY = int((altoPantalla / 2) - (altoVentana / 2)) - 40
 
-        # Asignación de la geometría en formato "anchoxalto+X+Y"
+        # Define el tamaño y posición de la ventana.
         self.geometry(f"{anchoVentana}x{altoVentana}+{posicionX}+{posicionY}")
-        # ---------------------------------------------------------
 
-        # Inicialización del gestor de datos (Singleton de estado global).
+        # Crea el gestor de datos que compartirá la información.
         self.gestor = GestorDatos() 
 
-        # Contenedor principal donde se renderizarán las vistas dinámicas.
+        # Contenedor para las diferentes pantallas.
         self.contenedor = tk.Frame(self)
         self.contenedor.pack(side="top", fill="both", expand=True)
 
@@ -42,8 +38,7 @@ class AppPrincipal(tk.Tk):
 
     def mostrarPantalla(self, clasePantalla):
         """
-        Destruye los widgets de la vista actual en el contenedor 
-        e inicializa y renderiza la nueva vista solicitada.
+        Limpia la pantalla actual y muestra la nueva.
         """
         for widget in self.contenedor.winfo_children():
             widget.destroy()

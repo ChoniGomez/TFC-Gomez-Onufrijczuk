@@ -3,155 +3,175 @@ import numpy as np
 def FR1(cromosoma, gestorDatos):
     """
     Restricción 1 (R1): Choques de horario.
-    Verifica que un facilitador no tenga superposición de módulos el mismo día.
+    Verifica que un facilitador no tenga clases en el mismo horario. Usa una 'timeline' para ser más eficiente.
     """
     conflictos = 0
     dias = gestorDatos["clases_req"][:, 0]
     inicios = gestorDatos["clases_req"][:, 1]
     fines = gestorDatos["clases_req"][:, 2]
+    num_modulos = gestorDatos["disp_horaria"].shape[2]
     
-    # Extracción de los facilitadores asignados, excluyendo índices nulos o inactivos (-1).
     facilitadores_unicos = np.unique(cromosoma)
     facilitadores_unicos = facilitadores_unicos[facilitadores_unicos != -1]
     
     for id_fac in facilitadores_unicos:
-        # Identificación de la totalidad de clases asociadas a la instancia del facilitador.
+        # Timeline: 7 días, N módulos por día.
+        timeline_facilitador = np.zeros((7, num_modulos), dtype=np.int16)
+        
         mascara_clases = np.any(cromosoma == id_fac, axis=1)
         clases_asignadas = np.where(mascara_clases)[0]
         
-        # Verificación de solapamiento temporal en caso de múltiples asignaciones.
-        if len(clases_asignadas) > 1:
-            for i in range(len(clases_asignadas) - 1):
-                for j in range(i + 1, len(clases_asignadas)):
-                    c1 = clases_asignadas[i]
-                    c2 = clases_asignadas[j]
-                    
-                    # Condición de colisión: igualdad de día y superposición de umbrales modulares.
-                    if dias[c1] == dias[c2]:
-                        if inicios[c1] <= fines[c2] and fines[c1] >= inicios[c2]:
-                            # Penalización calculada en base a la magnitud de los módulos superpuestos.
-                            modulos_superpuestos = min(fines[c1], fines[c2]) - max(inicios[c1], inicios[c2]) + 1
-                            conflictos += modulos_superpuestos
-                            
+        for clase_idx in clases_asignadas:
+            dia_clase = dias[clase_idx]
+            inicio_clase = inicios[clase_idx]
+            fin_clase = fines[clase_idx]
+            # Se marca el rango de módulos como ocupado en el día correspondiente.
+            timeline_facilitador[dia_clase, inicio_clase:fin_clase+1] += 1
+            
+        # Se cuentan los conflictos: cualquier módulo con valor > 1 indica un solapamiento.
+        # La penalización es la suma de los solapamientos (valor - 1).
+        conflictos += np.sum(np.maximum(0, timeline_facilitador - 1))
+
     return conflictos
 
 
 def FR2(cromosoma, gestorDatos):
     """
     Restricción 2 (R2): Respetar disponibilidad horaria contractual.
-    Compara los módulos de la clase asignada con la matriz tridimensional de disponibilidad.
+    Verifica que la clase asignada esté dentro de la disponibilidad horaria del facilitador.
     """
     conflictos = 0
-    matriz_clases_req = gestorDatos["clases_req"]
     matriz_disp_horaria = gestorDatos["disp_horaria"]
+    matriz_clases_req = gestorDatos["clases_req"]
     
-    # Evaluamos los 4 roles posibles (F1, F2, FC, PEE)
-    for rol in range(4):
-        ids_asignados = cromosoma[:, rol]
-        clases_activas = np.where(ids_asignados != -1)[0]
+    # Crear una matriz de requerimientos de módulos
+    matriz_requerimientos = np.zeros_like(matriz_disp_horaria, dtype=np.int8)
+    
+    # Encontrar todas las asignaciones activas
+    clases_indices, _ = np.where(cromosoma != -1)
+    if len(clases_indices) == 0:
+        return 0
         
-        for clase_idx in clases_activas:
-            id_fac = ids_asignados[clase_idx]
-            dia = matriz_clases_req[clase_idx, 0]
-            inicio = matriz_clases_req[clase_idx, 1]
-            fin = matriz_clases_req[clase_idx, 2]
-            
-            # Calculamos cuántos bloques dura la clase y cuántos tiene disponibles el profe
-            bloques_necesarios = fin - inicio + 1
-            bloques_disponibles = np.sum(matriz_disp_horaria[id_fac, dia, inicio:fin+1])
-            
-            # Si no le alcanzan los bloques disponibles, se cuenta como conflicto
-            if bloques_disponibles < bloques_necesarios:
-                # Penalizamos por la cantidad de bloques que le faltan (gradiente)
-                conflictos += (bloques_necesarios - bloques_disponibles)
+    # Obtener los datos de todas las asignaciones activas de una vez
+    facilitadores_indices = cromosoma[cromosoma != -1]
+    dias_clases = matriz_clases_req[clases_indices, 0]
+    inicios_clases = matriz_clases_req[clases_indices, 1]
+    fines_clases = matriz_clases_req[clases_indices, 2]
+
+    # Marcar todos los módulos requeridos en una sola pasada
+    for i in range(len(facilitadores_indices)):
+        matriz_requerimientos[facilitadores_indices[i], dias_clases[i], inicios_clases[i]:fines_clases[i]+1] = 1
+    
+    # Un módulo es un conflicto si es requerido (1) pero no está disponible (0)
+    conflictos_matriz = (matriz_requerimientos == 1) & (matriz_disp_horaria == 0)
+    conflictos = np.sum(conflictos_matriz)
                 
-    return conflictos
+    return int(conflictos)
 
 
 def FR3(cromosoma, gestorDatos):
     """
-    Restricción 3 (R3): Horas contractuales por semana (Máximo y Mínimo 80%).
-    Suma las horas totales de cada facilitador y las contrasta con su contrato.
+    Restricción 3 (R3): Horas semanales (Máximo).
+    Verifica que los facilitadores no excedan su máximo de horas por contrato.
     """
     matriz_clases_req = gestorDatos["clases_req"]
     vector_horas_max = gestorDatos["horas_max"]
-    vector_es_pee = gestorDatos["es_pee"]
-    
+
     # Determinación de la duración absoluta en módulos de la totalidad de clases requeridas.
     duraciones = matriz_clases_req[:, 2] - matriz_clases_req[:, 1] + 1
     max_id_fac = len(vector_horas_max)
-    bloques_acumulados = np.zeros(max_id_fac, dtype=int)
-    
-    for rol in range(4):
-        ids_asignados = cromosoma[:, rol]
-        mascara_validos = ids_asignados != -1
-        
-        pesos = duraciones[mascara_validos]
-        indices = ids_asignados[mascara_validos]
-        
-        if len(indices) > 0:
-            # Sumatoria vectorial agrupada de la carga modular por identificador unívoco.
-            acumulado_parcial = np.bincount(indices, weights=pesos, minlength=max_id_fac)
-            bloques_acumulados += acumulado_parcial.astype(int)
+
+    # Crear una matriz de pesos (duraciones) con la misma forma que el cromosoma
+    pesos_matriz = np.broadcast_to(duraciones[:, np.newaxis], cromosoma.shape)
+
+    # Aplanar el cromosoma y los pesos para bincount
+    ids_asignados = cromosoma.flatten()
+    pesos = pesos_matriz.flatten()
+    mascara_validos = ids_asignados != -1
+
+    # Usar bincount una sola vez para sumar todos los bloques por facilitador
+    if np.any(mascara_validos):
+        bloques_acumulados = np.bincount(ids_asignados[mascara_validos], weights=pesos[mascara_validos], minlength=max_id_fac)
+    else:
+        bloques_acumulados = np.zeros(max_id_fac, dtype=float)
             
     # Conversión dimensional de módulos a la unidad de horas estándar (Factor 4:1).
     horas_trabajadas = bloques_acumulados / 4.0
-    limite_min = vector_horas_max * 0.80
     
-    # Cuantificación escalar de la desviación contractual.
-    exceso_horas = np.maximum(0, horas_trabajadas - vector_horas_max)
-    falta_horas = np.maximum(0, limite_min - horas_trabajadas)
-    mask_min = (vector_es_pee == 0) & (vector_horas_max > 0)
-    
-    conflictos = np.sum(exceso_horas) + np.sum(falta_horas[mask_min])
-    return conflictos
+    # Cuantificación del NÚMERO de facilitadores en conflicto, no la suma de horas.
+
+    # Facilitadores que trabajan más de sus horas de contrato.
+    # Si el contrato es 0, cualquier hora trabajada es un exceso.
+    facilitadores_excedidos = horas_trabajadas > vector_horas_max
+
+    # La penalización es la cantidad de facilitadores que exceden su máximo.
+    conflictos = np.sum(facilitadores_excedidos)
+
+    return int(conflictos)
 
 
 def FR4(cromosoma, gestorDatos):
     """
-    Restricción 4 (R4): Facilitadores de Sprints (TC=5) deben liderar el trayecto.
-    Calcula si el profe tiene más del 50% de las horas totales de ese trayecto.
+    Restricción 4 (R4): Liderazgo en Sprints.
+    Verifica la experiencia requerida para liderar Sprints.
+    Penaliza con 1 por cada asignación a un Sprint que no cumpla el requisito.
     """
-    conflictos = 0
-    matriz_clases_req = gestorDatos["clases_req"]
     vector_tipo_clase = gestorDatos["tipo_clase"]
+    matriz_clases_req = gestorDatos["clases_req"]
+    vector_tipo_trayecto = gestorDatos["tipo_trayecto"]
     
-    duraciones = matriz_clases_req[:, 2] - matriz_clases_req[:, 1] + 1
     trayectos = matriz_clases_req[:, 3]
+    num_fac = len(gestorDatos["horas_max"])
+    max_id_trayecto = len(vector_tipo_trayecto)
+
+    # Paso 1: Contar participaciones en clases regulares por facilitador y trayecto.
+    # Una participación es una asignación a una clase, sin importar el rol (F1, F2, FC).
+    participaciones = np.zeros((num_fac, max_id_trayecto), dtype=int)
     
-    # Filtrado de clases categorizadas como metodologías Sprint (Tipo = 5).
-    sprints = np.where(vector_tipo_clase == 5)[0]
-    if len(sprints) == 0:
-        return 0
-        
-    for clase_sprint in sprints:
-        id_trayecto = trayectos[clase_sprint]
-        if id_trayecto == -1: continue
-        
-        # Filtramos todas las clases regulares de este trayecto específico
-        mascara_trayecto = (trayectos == id_trayecto) & (vector_tipo_clase != 5)
-        bloques_totales_trayecto = np.sum(duraciones[mascara_trayecto])
-        mitad_requerida = bloques_totales_trayecto / 2.0
-        
-        # Vemos quiénes están asignados a este sprint
-        roles_sprint = cromosoma[clase_sprint, 0:3]
-        roles_sprint = roles_sprint[roles_sprint != -1]
-        
-        for id_fac in roles_sprint:
-            # Verificamos cuántas horas regulares dio este profesor en el trayecto
-            mascara_fac = (cromosoma[:, 0] == id_fac) | (cromosoma[:, 1] == id_fac) | (cromosoma[:, 2] == id_fac)
-            bloques_docente = np.sum(duraciones[mascara_trayecto & mascara_fac])
+    mascara_regulares = (vector_tipo_clase != 5) & (trayectos != -1)
+    clases_regulares_idx = np.where(mascara_regulares)[0]
+    
+    if len(clases_regulares_idx) > 0:
+        # Para cada clase regular, obtener los facilitadores únicos y el trayecto.
+        for clase_idx in clases_regulares_idx:
+            facs_en_clase = np.unique(cromosoma[clase_idx, 0:3])
+            facs_en_clase = facs_en_clase[facs_en_clase != -1]
+            trayecto_clase = trayectos[clase_idx]
             
-            if bloques_docente < mitad_requerida:
-                # Penalizamos por las horas que le faltan para liderar
-                conflictos += (mitad_requerida - bloques_docente)
+            if len(facs_en_clase) > 0 and trayecto_clase != -1:
+                participaciones[facs_en_clase, trayecto_clase] += 1
+
+    # Paso 2: Verificar los Sprints.
+    conflictos = 0
+    sprints_idx = np.where(vector_tipo_clase == 5)[0]
+    if len(sprints_idx) == 0: return 0
+
+    # Iterar sobre cada asignación a un Sprint
+    for clase_idx in sprints_idx:
+        trayecto_sprint = trayectos[clase_idx]
+        if trayecto_sprint == -1: continue
+
+        tipo_trayecto_sprint = vector_tipo_trayecto[trayecto_sprint]
+        
+        # Definir el requisito de participación basado en el tipo de trayecto
+        requisito = 3 if tipo_trayecto_sprint == 1 else (1 if tipo_trayecto_sprint == 2 else 0)
+        if requisito == 0: continue
+
+        # Obtener los facilitadores asignados al Sprint (F1, F2, FC)
+        facs_en_sprint = cromosoma[clase_idx, 0:3]
+        facs_en_sprint = facs_en_sprint[facs_en_sprint != -1]
+
+        for fac_idx in facs_en_sprint:
+            # Verificar si el facilitador cumple el requisito
+            if participaciones[fac_idx, trayecto_sprint] < requisito:
+                conflictos += 1
                 
-    return conflictos
+    return int(conflictos)
 
 
 def FR5(cromosoma, gestorDatos):
     """
-    Restricción 5 (R5): Un facilitador no puede estar en más de 3 Sprints.
+    Restricción 5 (R5): Límite de Sprints. Un facilitador no puede estar en más de 3.
     """
     conflictos = 0
     vector_tipo_clase = gestorDatos["tipo_clase"]
@@ -175,7 +195,7 @@ def FR5(cromosoma, gestorDatos):
 
 def FR6(cromosoma, gestorDatos):
     """
-    Restricción 6 (R6): PEE obligatorio en clases integradas (Tipo 3 y 4).
+    Restricción 6 (R6): PEE obligatorio. Verifica que las clases que lo requieren tengan un PEE.
     """
     vector_tipo_clase = gestorDatos["tipo_clase"]
     
@@ -191,7 +211,7 @@ def FR6(cromosoma, gestorDatos):
 def FR7(cromosoma, gestorDatos):
     """
     Restricción 7 (R7): Compatibilidad de parejas docentes (Técnico/Pedagógico).
-    Evita que dos perfiles del mismo tipo se asignen juntos cuando no corresponde.
+    Verifica la compatibilidad de los perfiles en las parejas docentes.
     """
     conflictos = 0
     vector_tipo_clase = gestorDatos["tipo_clase"]
@@ -200,48 +220,49 @@ def FR7(cromosoma, gestorDatos):
     ids_f1 = cromosoma[:, 0]
     ids_f2 = cromosoma[:, 1]
     
-    # Condicionante previo: Solamente procesar instancias con esquema docente dual.
-    ambos_asignados = (ids_f1 != -1) & (ids_f2 != -1)
+    # Encontrar los índices de clases donde ambos F1 y F2 están asignados
+    ambos_asignados_idx = np.where((ids_f1 != -1) & (ids_f2 != -1))[0]
     
-    for idx in np.where(ambos_asignados)[0]:
-        tc = vector_tipo_clase[idx]
-        perfil1 = vector_perfil_fac[ids_f1[idx]]
-        perfil2 = vector_perfil_fac[ids_f2[idx]]
+    if len(ambos_asignados_idx) == 0:
+        return 0
         
-        # Restricción demográfica A: Grupos de menores de edad (Tipos 1 y 3) repelen la dualidad técnica (Perfil 1).
-        if (tc == 1 or tc == 3) and perfil1 == 1 and perfil2 == 1:
-            conflictos += 1
-        # Restricción demográfica B: Grupos de mayores de edad (Tipos 2 y 4) repelen la dualidad pedagógica (Perfil 2).
-        elif (tc == 2 or tc == 4) and perfil1 == 2 and perfil2 == 2:
-            conflictos += 1
+    # Obtener los datos relevantes para esas clases usando los índices
+    clases_con_pareja_tc = vector_tipo_clase[ambos_asignados_idx]
+    perfiles1 = vector_perfil_fac[ids_f1[ambos_asignados_idx]]
+    perfiles2 = vector_perfil_fac[ids_f2[ambos_asignados_idx]]
+    
+    # Condición A: Clases tipo 1 o 3 no pueden tener dos técnicos (perfil 1)
+    conflictos_a = ((clases_con_pareja_tc == 1) | (clases_con_pareja_tc == 3)) & (perfiles1 == 1) & (perfiles2 == 1)
+    # Condición B: Clases tipo 2 o 4 no pueden tener dos pedagógicos (perfil 2)
+    conflictos_b = ((clases_con_pareja_tc == 2) | (clases_con_pareja_tc == 4)) & (perfiles1 == 2) & (perfiles2 == 2)
+    
+    conflictos = np.sum(conflictos_a) + np.sum(conflictos_b)
             
-    return conflictos
+    return int(conflictos)
 
 
 def FR8(cromosoma, gestorDatos):
     """
-    Restricción 8 (R8): Competencia del facilitador en el trayecto asignado.
-    Cruza los IDs de los asignados con la matriz de conocimientos.
+    Restricción 8 (R8): Competencia en trayecto. Verifica que el facilitador sea competente.
     """
-    conflictos = 0
     matriz_clases_req = gestorDatos["clases_req"]
     matriz_conocimiento_trayecto = gestorDatos["conocimiento_trayecto"]
     
     trayectos_clases = matriz_clases_req[:, 3]
     
-    # Inspección de validez de asignación para la totalidad de roles activos.
-    for rol in range(4):
-        ids_asignados = cromosoma[:, rol]
+    # Aplanar el cromosoma y repetir los trayectos para alinear
+    ids_asignados = cromosoma.flatten()
+    trayectos_repetidos = np.repeat(trayectos_clases, 4) # 4 roles
+    
+    # Crear una máscara para las asignaciones válidas y que requieren trayecto
+    mascara_validos = (ids_asignados != -1) & (trayectos_repetidos != -1)
+    if not np.any(mascara_validos):
+        return 0
         
-        mascara_validos = (ids_asignados != -1) & (trayectos_clases != -1)
-        clases_a_evaluar = np.where(mascara_validos)[0]
-        
-        if len(clases_a_evaluar) > 0:
-            facs = ids_asignados[clases_a_evaluar]
-            trays = trayectos_clases[clases_a_evaluar]
+    facs = ids_asignados[mascara_validos]
+    trays = trayectos_repetidos[mascara_validos]
+    
+    conocimientos = matriz_conocimiento_trayecto[facs, trays]
+    conflictos = np.sum(conocimientos == 0)
             
-            # Validación booleana mediante consulta a la matriz relacional Docente/Trayecto.
-            conocimientos = matriz_conocimiento_trayecto[facs, trays]
-            conflictos += np.sum(conocimientos == 0)
-            
-    return conflictos
+    return int(conflictos)
