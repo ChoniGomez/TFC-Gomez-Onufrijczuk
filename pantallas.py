@@ -486,8 +486,9 @@ class PantallaAlgoritmo(tk.Frame):
             max_x = max(1, configAG.generacion_actual - 1) if configAG.generacion_actual > 0 else 1
             self.ax.set_xlim(0, max_x) 
             
-            self.ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25), ncol=2)
+            self.ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.3), ncol=2)
             
+            self.fig.tight_layout()  # Ajusta el gráfico para que la leyenda sea visible.
             self.canvas.draw()
 
             messagebox.showinfo("Proceso Terminado", 
