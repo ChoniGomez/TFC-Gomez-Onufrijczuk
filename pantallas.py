@@ -108,6 +108,7 @@ class PantallaAlgoritmo(tk.Frame):
     def __init__(self, parent, controlador):
         super().__init__(parent)
         self.controlador = controlador
+        self.solucion_campeona = None
         
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
@@ -341,7 +342,7 @@ class PantallaAlgoritmo(tk.Frame):
         btnEjecutar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
 
         btnExportar = tk.Button(frameBotones, text="Exportar Horarios", bg="#2196F3", fg="white", font=("Arial", 10, "bold"),
-                                command=lambda: print("[SISTEMA] Exportación de resultados solicitada."))
+                                command=self.exportarHorarios)
         btnExportar.pack(side="left", expand=True, fill="x", padx=5, ipady=5)
 
         btnCancelar = tk.Button(frameBotones, text="Cancelar", bg="#f44336", fg="white", font=("Arial", 10, "bold"),
@@ -353,6 +354,74 @@ class PantallaAlgoritmo(tk.Frame):
         Finaliza el proceso actual y retorna a la vista de gestión de datos.
         """
         self.controlador.mostrarPantalla(PantallaCarga)
+
+    def exportarHorarios(self):
+        """
+        Exporta la solución campeona a un archivo CSV.
+        """
+        if not self.solucion_campeona:
+            messagebox.showwarning("Advertencia", "Primero debe ejecutar el algoritmo para generar un horario antes de exportar.")
+            return
+
+        try:
+            # Mapeo de IDs a nombres para una búsqueda eficiente
+            fac_id_map = {f.idFacilitador: f"{f.nombre} {f.apellido}" for f in self.controlador.gestor.listaFacilitadores}
+            clase_id_map = {c.idClase: c for c in self.controlador.gestor.listaClases}
+
+            def _modulo_a_hora_str(modulo):
+                if not modulo or modulo <= 0:
+                    return ""
+                total_cuartos = modulo - 1
+                hora = 8 + total_cuartos // 4
+                minutos = (total_cuartos % 4) * 15
+                return f"{hora:02d}:{minutos:02d}"
+
+            data_para_exportar = []
+            for gen in self.solucion_campeona.genes:
+                clase = clase_id_map.get(gen.idGen)
+                if not clase:
+                    continue
+
+                modulos = [m.numeroModulo for m in clase.horarioDeClase.modulos]
+                hora_inicio_str = ""
+                hora_fin_str = ""
+                if modulos:
+                    start_mod = min(modulos)
+                    # La hora de fin es el inicio del siguiente bloque al último
+                    end_mod = max(modulos) + 1
+                    hora_inicio_str = _modulo_a_hora_str(start_mod)
+                    hora_fin_str = _modulo_a_hora_str(end_mod)
+
+                # Determinar el string del tipo de clase
+                tipo_clase_str = "-"
+                if clase.tipoDeClase == 5:
+                    tipo_clase_str = "SPRINT"
+                elif clase.trayecto and clase.trayecto.tipoTrayecto:
+                    tipo_clase_str = clase.trayecto.tipoTrayecto.nombre
+
+                record = {
+                    'Salon': clase.salon.nombre if clase.salon else "-",
+                    'Dia': clase.horarioDeClase.dia,
+                    'Hora Inicio': hora_inicio_str,
+                    'Hora Fin': hora_fin_str,
+                    'Trayecto': clase.trayecto.nombre.upper() if clase.trayecto else "-",
+                    'Nivel': clase.trayecto.nivel.upper() if clase.trayecto else "-",
+                    'Tipo de Clase': tipo_clase_str,
+                    'Facilitador 1': fac_id_map.get(gen.idFacilitador1, "-"),
+                    'Facilitador 2': fac_id_map.get(gen.idFacilitador2, "-"),
+                    'Facilitador Complementario': fac_id_map.get(gen.idFacilitadorComplementario, "-"),
+                    'Profesor de Educacion Especial': fac_id_map.get(gen.idProfesorEducacionEspecial, "-")
+                }
+                data_para_exportar.append(record)
+            
+            df = pd.DataFrame(data_para_exportar)
+
+            filepath = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("Archivos CSV", "*.csv")], initialfile="Horas_Clases_Solucion.csv", title="Guardar Horario Generado")
+            if filepath:
+                df.to_csv(filepath, index=False, encoding='utf-8-sig')
+                messagebox.showinfo("Éxito", f"El horario ha sido exportado correctamente en:\n{filepath}")
+        except Exception as e:
+            messagebox.showerror("Error de Exportación", f"Ocurrió un error al exportar el horario:\n{str(e)}")
 
     def ejecutarAlgoritmo(self):
         """
@@ -459,6 +528,7 @@ class PantallaAlgoritmo(tk.Frame):
             poblacion_final = ejecutarCicloGenetico(poblacion_inicial, configAG, self.controlador.gestor, log_file=nombre_archivo)
             
             campeon = poblacion_final[0]
+            self.solucion_campeona = campeon
 
             # ==========================================
             # FASE 5: MOSTRAR RESULTADOS

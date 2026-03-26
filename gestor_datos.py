@@ -29,23 +29,30 @@ class GestorDatos:
                     3: "Ambos", 4: "Profesor Educación Especial"
                 }
                 
+                facilitadores_omitidos = 0
                 for indice, fila in df.iterrows():
                     valorTipo = int(float(fila['Tipo de facilitador']))
+
+                    # Se omiten los facilitadores de tipo 0 (Administrativo) ya que no se asignan a clases.
+                    if valorTipo == 0:
+                        facilitadores_omitidos += 1
+                        continue
+
                     nombreTipo = nombresTipos.get(valorTipo, "Desconocido")
                     
                     objTipo = TipoFacilitador(idTipo=valorTipo, nombre=nombreTipo)
                     
                     nuevoFacilitador = Facilitador(
-                        nombre=fila['Nombre'], 
-                        apellido=fila['Apellido'], 
+                        nombre=fila['Nombre'],
+                        apellido=fila['Apellido'],
                         dni=fila['DNI'],
-                        idFacilitador=fila['ID'], 
+                        idFacilitador=fila['ID'],
                         cantidadHorasCumplir=fila['Horas contrato'],
                         tipoFacilitador=objTipo
                     )
                     self.listaFacilitadores.append(nuevoFacilitador)
                 
-                print(f"[SISTEMA] Carga de facilitadores completa: {len(self.listaFacilitadores)}.")
+                print(f"[SISTEMA] Carga de facilitadores completa: {len(self.listaFacilitadores)} cargados ({facilitadores_omitidos} omitidos).")
                 return True, "Carga completada"
 
             # ----------------------------------------------------

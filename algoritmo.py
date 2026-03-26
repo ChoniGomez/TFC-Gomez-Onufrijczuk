@@ -191,7 +191,8 @@ def generarPoblacionInicial(och, gestorDatos):
                 genNuevo.idFacilitador2 = asignar_y_actualizar("F2")
                 genNuevo.idFacilitadorComplementario = asignar_y_actualizar("FC")
 
-                if clase.tipoDeClase == 3 or clase.tipoDeClase == 4:
+                # Solo se asigna PEE si la clase es de tipo 2 o 4, que son las que lo requieren.
+                if clase.tipoDeClase == 2 or clase.tipoDeClase == 4:
                     genNuevo.idProfesorEducacionEspecial = asignar_y_actualizar("PEE")
             
             poblacionDelGrupo.append(cromosomaActual)
@@ -527,6 +528,10 @@ def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutaci
                         break
                 if tiene_choque: continue
                 
+                # Verificación adicional: Evitar duplicados en la misma clase.
+                if cand_idx in cromosoma_actual[clase_idx]:
+                    continue
+
                 valid_candidates.append(cand_idx)
 
             if valid_candidates:
