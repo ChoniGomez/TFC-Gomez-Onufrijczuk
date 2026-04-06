@@ -119,14 +119,17 @@ def FR4(cromosoma, gestorDatos):
     vector_tipo_clase = gestorDatos["tipo_clase"]
     matriz_clases_req = gestorDatos["clases_req"]
     vector_tipo_trayecto = gestorDatos["tipo_trayecto"]
+    vector_trayecto_familia = gestorDatos["trayecto_familia"]
+    max_id_familia = gestorDatos["max_id_familia"]
     
     trayectos = matriz_clases_req[:, 3]
     num_fac = len(gestorDatos["horas_max"])
-    max_id_trayecto = len(vector_tipo_trayecto)
 
-    # Paso 1: Contar participaciones en clases regulares por facilitador y trayecto.
-    # Una participación es una asignación a una clase, sin importar el rol (F1, F2, FC).
-    participaciones = np.zeros((num_fac, max_id_trayecto), dtype=int)
+    # Paso 1: Contar participaciones en clases regulares por facilitador y FAMILIA de trayecto.
+    # La experiencia se agrupa por el nombre del trayecto (ej. 'tecnokids'), sin importar
+    # el nivel (Básico/Avanzado), lo que permite que la experiencia en un nivel
+    # sea válida para un SPRINT de otro nivel dentro de la misma familia.
+    participaciones = np.zeros((num_fac, max_id_familia), dtype=int)
     
     mascara_regulares = (vector_tipo_clase != 5) & (trayectos != -1)
     clases_regulares_idx = np.where(mascara_regulares)[0]
@@ -136,10 +139,11 @@ def FR4(cromosoma, gestorDatos):
         for clase_idx in clases_regulares_idx:
             facs_en_clase = np.unique(cromosoma[clase_idx, 0:3])
             facs_en_clase = facs_en_clase[facs_en_clase != -1]
-            trayecto_clase = trayectos[clase_idx]
+            trayecto_clase_id = trayectos[clase_idx]
             
-            if len(facs_en_clase) > 0 and trayecto_clase != -1:
-                participaciones[facs_en_clase, trayecto_clase] += 1
+            if len(facs_en_clase) > 0 and trayecto_clase_id != -1:
+                familia_id = vector_trayecto_familia[trayecto_clase_id]
+                participaciones[facs_en_clase, familia_id] += 1
 
     # Paso 2: Verificar los Sprints.
     conflictos = 0
@@ -148,23 +152,32 @@ def FR4(cromosoma, gestorDatos):
 
     # Iterar sobre cada asignación a un Sprint
     for clase_idx in sprints_idx:
-        trayecto_sprint = trayectos[clase_idx]
-        if trayecto_sprint == -1: continue
+        # Contador de fallos local para este Sprint específico.
+        fallos_en_sprint_actual = 0
 
-        tipo_trayecto_sprint = vector_tipo_trayecto[trayecto_sprint]
+        trayecto_sprint_id = trayectos[clase_idx]
+        if trayecto_sprint_id == -1: continue
+
+        tipo_trayecto_sprint = vector_tipo_trayecto[trayecto_sprint_id]
         
         # Definir el requisito de participación basado en el tipo de trayecto
         requisito = 3 if tipo_trayecto_sprint == 1 else (1 if tipo_trayecto_sprint == 2 else 0)
         if requisito == 0: continue
+
+        familia_sprint_id = vector_trayecto_familia[trayecto_sprint_id]
 
         # Obtener los facilitadores asignados al Sprint (F1, F2, FC)
         facs_en_sprint = cromosoma[clase_idx, 0:3]
         facs_en_sprint = facs_en_sprint[facs_en_sprint != -1]
 
         for fac_idx in facs_en_sprint:
-            # Verificar si el facilitador cumple el requisito
-            if participaciones[fac_idx, trayecto_sprint] < requisito:
-                conflictos += 1
+            # Verificar si el facilitador cumple el requisito para la FAMILIA del trayecto.
+            if participaciones[fac_idx, familia_sprint_id] < requisito:
+                fallos_en_sprint_actual += 1
+        
+        # Nueva regla: Un Sprint tiene un conflicto solo si MÁS DE UN facilitador no cumple.
+        if fallos_en_sprint_actual > 1:
+            conflictos += 1
                 
     return int(conflictos)
 

@@ -2,6 +2,7 @@ import random
 import numpy as np
 import time
 import copy
+from collections import defaultdict
 from clases import Hormiga, Cromosoma, Gen
 
 # Importación de las restricciones del modelo adaptadas para el procesamiento tensorial
@@ -154,6 +155,29 @@ def generarPoblacionInicial(och, gestorDatos):
     max_id_modulo = max(modulos_en_clases + [0])
     # --- Fin Setup ---
 
+    # --- Ordenamiento Estratégico de Clases ---
+    # Agrupa las clases por trayecto y, dentro de cada grupo, pospone los Sprints (tipo 5) al final.
+    # Esta estrategia es superior a un simple ordenamiento global porque:
+    # 1. Procesa todas las clases de un mismo trayecto de forma contigua.
+    # 2. Permite que los facilitadores acumulen la "experiencia" necesaria (FR4) para un trayecto específico
+    #    justo antes de que se intenten asignar los Sprints de ESE MISMO trayecto.
+    # 3. Mejora la calidad de la solución inicial y acelera la convergencia.
+    
+    clases_por_trayecto = defaultdict(list)
+    clases_sin_trayecto = []
+    for clase in gestorDatos.listaClases:
+        if clase.trayecto:
+            clases_por_trayecto[clase.trayecto.idTrayecto].append(clase)
+        else:
+            clases_sin_trayecto.append(clase)
+
+    clases_ordenadas = []
+    for id_trayecto in sorted(clases_por_trayecto.keys()):
+        clases_del_trayecto = clases_por_trayecto[id_trayecto]
+        clases_del_trayecto_ordenadas = sorted(clases_del_trayecto, key=lambda c: c.tipoDeClase == 5)
+        clases_ordenadas.extend(clases_del_trayecto_ordenadas)
+    clases_ordenadas.extend(clases_sin_trayecto)
+
     for numGrupo in range(grupos):
         poblacionDelGrupo = []
         for _ in range(hormigasPorGrupo):
@@ -162,7 +186,7 @@ def generarPoblacionInicial(och, gestorDatos):
             horarios_hormiga = {} # Timeline para esta hormiga/solución
             workload_hormiga = {} # Carga de trabajo (en bloques) para esta hormiga
             
-            for clase in gestorDatos.listaClases:
+            for clase in clases_ordenadas:
                 genNuevo = Gen(idGen=clase.idClase, idFacilitador1=None, idFacilitador2=None, 
                                idFacilitadorComplementario=None, idProfesorEducacionEspecial=None, 
                                evaluar=True, cromosoma=cromosomaActual)
@@ -237,7 +261,18 @@ def inicializarEntornoMatricial(gestorDatos):
     modulos_en_disp = [int(m.numeroModulo) for f in gestorDatos.listaFacilitadores for d in f.disponibilidadesHorarias for m in d.modulos]
     max_id_modulo = max(modulos_en_clases + modulos_en_disp + [0])
     
-    # 3. Vector para mapear ID de trayecto a su tipo (1: Tradicional, 2: Propuesta)
+    # 3. Mapeo de trayectos a "familias" por nombre, para agrupar niveles (Básico/Avanzado).
+    trayecto_nombres = sorted(list(set([t.nombre for t in gestorDatos.listaTrayectos])))
+    mapa_nombre_a_familia_id = {nombre: i for i, nombre in enumerate(trayecto_nombres)}
+    max_id_familia = len(trayecto_nombres)
+    vector_trayecto_familia = np.zeros(max_id_trayecto + 1, dtype=int)
+    for trayecto in gestorDatos.listaTrayectos:
+        id_t = int(trayecto.idTrayecto)
+        familia_id = mapa_nombre_a_familia_id[trayecto.nombre]
+        if id_t < len(vector_trayecto_familia):
+            vector_trayecto_familia[id_t] = familia_id
+
+    # 4. Vector para mapear ID de trayecto a su tipo (1: Tradicional, 2: Propuesta)
     vector_tipo_trayecto = np.zeros(max_id_trayecto + 1, dtype=int)
     for trayecto in gestorDatos.listaTrayectos:
         id_t = int(trayecto.idTrayecto)
@@ -297,7 +332,9 @@ def inicializarEntornoMatricial(gestorDatos):
         "es_pee": vector_es_pee,
         "tipo_clase": vector_tipo_clase,
         "perfil_fac": vector_perfil_fac,
-        "tipo_trayecto": vector_tipo_trayecto
+        "tipo_trayecto": vector_tipo_trayecto,
+        "trayecto_familia": vector_trayecto_familia,
+        "max_id_familia": max_id_familia
     }
     return datos_numpy
 
@@ -404,7 +441,7 @@ def operadorSeleccion(tensor_poblacion, aptitudes, elitismo, torneo, ruleta):
             
     return poblacion_intermedia
 
-def operadorCruza(poblacion_intermedia, cantidad_elite, prob_cruza=0.90, puntos_cruza=3):
+def operadorCruza(poblacion_intermedia, cantidad_elite, puntos_cruza):
     """
     Realiza el cruce entre padres para generar nuevos individuos (hijos),
     combinando partes de sus cromosomas.
@@ -425,29 +462,28 @@ def operadorCruza(poblacion_intermedia, cantidad_elite, prob_cruza=0.90, puntos_
         idx_p1 = indices_padres[i]
         idx_p2 = indices_padres[i+1]
         
-        if random.random() <= prob_cruza:
-            num_cortes = min(puntos_cruza, num_clases - 1)
+        # Se asume que la cruza siempre ocurre para cada pareja de padres.
+        num_cortes = min(puntos_cruza, num_clases - 1)
+        
+        hijo1 = poblacion_intermedia[idx_p1].copy()
+        hijo2 = poblacion_intermedia[idx_p2].copy()
+
+        # La lógica actual de cruce requiere al menos 2 puntos para funcionar.
+        if num_cortes >= 2:
             cortes = sorted(random.sample(range(1, num_clases), num_cortes))
-            
-            hijo1 = poblacion_intermedia[idx_p1].copy()
-            hijo2 = poblacion_intermedia[idx_p2].copy()
-            
             hijo1[cortes[0]:cortes[1]] = poblacion_intermedia[idx_p2, cortes[0]:cortes[1]]
             hijo2[cortes[0]:cortes[1]] = poblacion_intermedia[idx_p1, cortes[0]:cortes[1]]
             
             if len(cortes) > 2:
                 hijo1[cortes[2]:] = poblacion_intermedia[idx_p2, cortes[2]:]
                 hijo2[cortes[2]:] = poblacion_intermedia[idx_p1, cortes[2]:]
-                
-            poblacion_cruzada[cantidad_elite + i] = hijo1
-            poblacion_cruzada[cantidad_elite + i + 1] = hijo2
-        else:
-            poblacion_cruzada[cantidad_elite + i] = poblacion_intermedia[idx_p1]
-            poblacion_cruzada[cantidad_elite + i + 1] = poblacion_intermedia[idx_p2]
+        
+        poblacion_cruzada[cantidad_elite + i] = hijo1
+        poblacion_cruzada[cantidad_elite + i + 1] = hijo2
             
     return poblacion_cruzada
 
-def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutacion=0.05, probs_mutacion=None):
+def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutacion=0.02, probs_mutacion=None):
     """
     Introduce cambios aleatorios (mutaciones) en los individuos para mantener
     la diversidad en la población y evitar estancamiento.
@@ -512,9 +548,6 @@ def operadorMutacion(poblacion_cruzada, datos_numpy, cantidad_elite, prob_mutaci
                 max_modulos_contrato = vector_horas_max[cand_idx] * 4
                 if max_modulos_contrato > 0 and (workload_actual[cand_idx] + clase_duracion) > max_modulos_contrato: continue
                 
-                # FR3: Descartar si ya cumplió el mínimo de horas (80%).
-                min_modulos_contrato = (vector_horas_max[cand_idx] * 4) * 0.8
-                if min_modulos_contrato > 0 and workload_actual[cand_idx] >= min_modulos_contrato: continue
 
                 # FR1: Choque de horario
                 tiene_choque = False
@@ -606,7 +639,7 @@ def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos, log_file=Non
         pob_intermedia = operadorSeleccion(tensor_poblacion, aptitudes, elitismo, 
                                            configAG.seleccionTorneo, configAG.seleccionRuleta)
         
-        pob_cruzada = operadorCruza(pob_intermedia, cantidad_elite, prob_cruza=0.90, puntos_cruza=configAG.puntosCruza)
+        pob_cruzada = operadorCruza(pob_intermedia, cantidad_elite, puntos_cruza=configAG.puntosCruza)
         
         probs_roles = [
             configAG.probMutacionF1,
@@ -673,6 +706,14 @@ def ejecutarCicloGenetico(poblacion_objetos, configAG, gestorDatos, log_file=Non
             f.write(f" - FR6 (PEE obligatorio)           : {v_fr6}\n")
             f.write(f" - FR7 (Compatibilidad de parejas) : {v_fr7}\n")
             f.write(f" - FR8 (Competencia en trayecto)   : {v_fr8}\n")
+            f.write("==================================================\n\n")
+            f.write("--- EVOLUCIÓN DE LA POBLACIÓN POR GENERACIÓN ---\n")
+            f.write("Generación | Aptitud Máxima | Aptitud Promedio\n")
+            f.write("----------------------------------------------\n")
+            for i in range(len(configAG.historial_maximos)):
+                max_apt = configAG.historial_maximos[i]
+                avg_apt = configAG.historial_promedios[i]
+                f.write(f"{i:<10} | {max_apt:<14.4f} | {avg_apt:<16.4f}\n")
             f.write("==================================================\n")
 
     modelo_cromosoma = poblacion_objetos[0]

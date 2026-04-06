@@ -1,6 +1,7 @@
 import tkinter as tk
 import os
 from datetime import datetime
+from collections import defaultdict
 from tkinter import filedialog, messagebox, ttk
 import pandas as pd
 import numpy as np
@@ -23,10 +24,33 @@ class PantallaInicio(tk.Frame):
     """
     def __init__(self, parent, controlador):
         super().__init__(parent)
-        tk.Label(self, text="TFC Gomez - Onufrijczuk", font=("Arial", 20, "bold"), pady=50).pack()
+        # Contenedor para centrar los elementos verticalmente
+        container = tk.Frame(self)
+        container.pack(expand=True)
 
-        tk.Button(self, text="INICIAR", width=20, height=2, bg="#4CAF50", fg="white", font=("Arial", 12, "bold"),
-                  command=lambda: controlador.mostrarPantalla(PantallaCarga)).pack()
+        tk.Label(container, text="Trabajo Final de Carrera (TFC)", font=("Arial", 20, "bold")).pack()
+
+        ttk.Separator(container, orient='horizontal').pack(fill='x', padx=100, pady=15)
+
+        details_text = (
+            "• Título: Optimización de la planificación de horarios y recursos en la Escuela de Robótica de Misiones\n"
+            "  mediante algoritmos genéticos y de colonia de hormigas.\n\n"
+            "• Autores: Gomez, Jonathan Matias & Onufrijczuk, Juan Marcos.\n\n"
+            "• Director: Esp. Ing. Berger, Javier.\n"
+            "• Codirector: Mgtr. Ing. Pedrazzini, Liliana.\n\n"
+            "• Carrera: Ingeniería en Informática (Plan 2017).\n"
+            "• Universidad: Universidad Gastón Dachary (UGD).\n"
+            "• Año: 2026."
+        )
+        
+        # Frame para alinear el bloque de texto a la izquierda dentro del contenedor centrado
+        details_frame = tk.Frame(container)
+        details_frame.pack(pady=10)
+        
+        tk.Label(details_frame, text=details_text, justify=tk.LEFT, font=("Arial", 15)).pack()
+
+        tk.Button(container, text="INICIAR", width=20, height=2, bg="#4CAF50", fg="white", font=("Arial", 12, "bold"),
+                  command=lambda: controlador.mostrarPantalla(PantallaCarga)).pack(pady=40)
 
 
 class PantallaCarga(tk.Frame):
@@ -38,20 +62,23 @@ class PantallaCarga(tk.Frame):
         self.controlador = controlador
         self.checksVisuales = {}
 
-        tk.Label(self, text="Carga de Archivos CSV", font=("Arial", 16, "bold"), pady=20).pack()
+        # Contenedor principal para centrar todo el contenido
+        container = tk.Frame(self)
+        container.pack(expand=True)
 
+        tk.Label(container, text="Carga de Archivos CSV", font=("Arial", 16, "bold"), pady=20).pack()
         # Archivos necesarios
         opciones = [
-            ("Cargar Facilitadores", "facilitadores"),
-            ("Cargar Trayectos", "trayectos"),
-            ("Cargar Facilitadores - Trayectos", "fac_trayectos"),
-            ("Cargar Disponibilidad Horaria", "disponibilidad"),
+            ("Cargar facilitadores", "facilitadores"),
+            ("Cargar trayectos", "trayectos"),
+            ("Cargar facilitadores - trayectos", "fac_trayectos"),
+            ("Cargar disponibilidad horaria", "disponibilidad"),
             ("Cargar horarios de clases", "horarios_clases")
         ]
 
         # Frame para alinear los botones
-        frameCentral = tk.Frame(self)
-        frameCentral.pack()
+        frameCentral = tk.Frame(container)
+        frameCentral.pack(pady=10)
 
         for texto, clave in opciones:
             frameFila = tk.Frame(frameCentral)
@@ -74,10 +101,10 @@ class PantallaCarga(tk.Frame):
             self.checksVisuales[clave] = lblCheck
 
         # Botón para ir a la siguiente pantalla
-        btnSiguiente = tk.Button(self, text="Siguiente →", width=15, bg="#2196F3", fg="white",
+        btnSiguiente = tk.Button(container, text="Siguiente →", width=15, bg="#2196F3", fg="white",
                                  font=("Arial", 12, "bold"), cursor="hand2",
                                  command=self.irAAlgoritmo)
-        btnSiguiente.pack(side="bottom", pady=40, ipady=5)
+        btnSiguiente.pack(pady=40, ipady=5)
 
     def seleccionarArchivo(self, clave):
         """
@@ -279,7 +306,7 @@ class PantallaAlgoritmo(tk.Frame):
         
         frameCruzaIn = tk.Frame(lfCruza)
         frameCruzaIn.pack(expand=True)
-        tk.Label(frameCruzaIn, text="Puntos Cruza :").grid(row=0, column=0, sticky="e")
+        tk.Label(frameCruzaIn, text="Puntos Cruza :").grid(row=0, column=0, sticky="e", pady=5)
         self.entCruza = ttk.Entry(frameCruzaIn, width=12)
         self.entCruza.insert(0, "20")
         self.entCruza.grid(row=0, column=1, sticky="w", padx=5)
@@ -364,9 +391,9 @@ class PantallaAlgoritmo(tk.Frame):
             return
 
         try:
-            # Mapeo de IDs a nombres para una búsqueda eficiente
-            fac_id_map = {f.idFacilitador: f"{f.nombre} {f.apellido}" for f in self.controlador.gestor.listaFacilitadores}
+            # Mapas para búsquedas eficientes
             clase_id_map = {c.idClase: c for c in self.controlador.gestor.listaClases}
+            fac_id_name_map = {f.idFacilitador: f"{f.nombre} {f.apellido}" for f in self.controlador.gestor.listaFacilitadores}
 
             def _modulo_a_hora_str(modulo):
                 if not modulo or modulo <= 0:
@@ -407,17 +434,80 @@ class PantallaAlgoritmo(tk.Frame):
                     'Trayecto': clase.trayecto.nombre.upper() if clase.trayecto else "-",
                     'Nivel': clase.trayecto.nivel.upper() if clase.trayecto else "-",
                     'Tipo de Clase': tipo_clase_str,
-                    'Facilitador 1': fac_id_map.get(gen.idFacilitador1, "-"),
-                    'Facilitador 2': fac_id_map.get(gen.idFacilitador2, "-"),
-                    'Facilitador Complementario': fac_id_map.get(gen.idFacilitadorComplementario, "-"),
-                    'Profesor de Educacion Especial': fac_id_map.get(gen.idProfesorEducacionEspecial, "-")
+                    'Facilitador 1': fac_id_name_map.get(gen.idFacilitador1, "-"),
+                    'Facilitador 2': fac_id_name_map.get(gen.idFacilitador2, "-"),
+                    'Facilitador Complementario': fac_id_name_map.get(gen.idFacilitadorComplementario, "-"),
+                    'Profesor de Educacion Especial': fac_id_name_map.get(gen.idProfesorEducacionEspecial, "-")
                 }
+
+                # --- Búsqueda de Suplentes (Lógica de Emergencia Simplificada) ---
+                # Un suplente es cualquier Facilitador Complementario (FC) de otra clase que se esté dando al mismo tiempo.
+                # No se considera competencia, disponibilidad ni experiencia.
+                suplentes_potenciales_ids = set()
+                ranked_substitutes = []
+
+                if clase and clase.trayecto and clase.horarioDeClase.modulos:
+                    clase_actual_dia = clase.horarioDeClase.dia
+                    clase_actual_modulos = [m.numeroModulo for m in clase.horarioDeClase.modulos]
+                    clase_actual_start = min(clase_actual_modulos)
+                    clase_actual_end = max(clase_actual_modulos)
+
+                    # Iterar a través de todas las demás clases para encontrar las concurrentes
+                    for other_gen in self.solucion_campeona.genes:
+                        if other_gen.idGen == gen.idGen:
+                            continue
+
+                        other_clase = clase_id_map.get(other_gen.idGen)
+                        if not other_clase or not other_clase.horarioDeClase.modulos:
+                            continue
+                        
+                        # Verificar si hay superposición de horarios
+                        if other_clase.horarioDeClase.dia == clase_actual_dia:
+                            other_modulos = [m.numeroModulo for m in other_clase.horarioDeClase.modulos]
+                            other_start = min(other_modulos)
+                            other_end = max(other_modulos)
+
+                            # Si los horarios se superponen y la otra clase tiene un FC, se añade como potencial suplente
+                            if (clase_actual_start <= other_end and other_start <= clase_actual_end) and other_gen.idFacilitadorComplementario is not None:
+                                suplentes_potenciales_ids.add(other_gen.idFacilitadorComplementario)
+
+                    # Eliminar de la lista de suplentes a los facilitadores que ya están asignados a la clase actual
+                    current_assigned_facs = {gen.idFacilitador1, gen.idFacilitador2, gen.idFacilitadorComplementario, gen.idProfesorEducacionEspecial}
+                    suplentes_final_ids = list(suplentes_potenciales_ids - current_assigned_facs)
+                    
+                    # Obtener los nombres de los primeros 4 suplentes
+                    ranked_substitutes = [fac_id_name_map.get(fid) for fid in suplentes_final_ids[:4]]
+
+                record['Suplente 1'] = ranked_substitutes[0] if len(ranked_substitutes) > 0 else "-"
+                record['Suplente 2'] = ranked_substitutes[1] if len(ranked_substitutes) > 1 else "-"
+                record['Suplente 3'] = ranked_substitutes[2] if len(ranked_substitutes) > 2 else "-"
+                record['Suplente 4'] = ranked_substitutes[3] if len(ranked_substitutes) > 3 else "-"
                 data_para_exportar.append(record)
             
             df = pd.DataFrame(data_para_exportar)
 
             filepath = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("Archivos CSV", "*.csv")], initialfile="Horas_Clases_Solucion.csv", title="Guardar Horario Generado")
             if filepath:
+                # --- Lógica para reordenar y ordenar el DataFrame antes de exportar ---
+                
+                # 1. Definir el nuevo orden de las columnas según lo solicitado.
+                nuevo_orden_columnas = [
+                    'Hora Inicio', 'Hora Fin', 'Dia', 'Salon', 'Trayecto', 'Nivel', 
+                    'Tipo de Clase', 'Facilitador 1', 'Facilitador 2', 
+                    'Facilitador Complementario', 'Profesor de Educacion Especial',
+                    'Suplente 1', 'Suplente 2', 'Suplente 3', 'Suplente 4'
+                ]
+                df = df[nuevo_orden_columnas]
+
+                # 2. Definir el orden correcto de los días de la semana para el ordenamiento de filas.
+                dias_ordenados = ['Lunes', 'Martes', 'Miercoles', 'Miércoles', 'Jueves', 'Viernes', 'Sabado', 'Sábado', 'Domingo']
+                
+                # 3. Convertir la columna 'Dia' a un tipo categórico con el orden personalizado.
+                #    Esto asegura que al ordenar, se respete el orden de la semana y no el alfabético.
+                df['Dia'] = pd.Categorical(df['Dia'], categories=dias_ordenados, ordered=True)
+                
+                # 4. Ordenar las filas: primero por día y luego por hora de inicio.
+                df.sort_values(by=['Dia', 'Hora Inicio'], inplace=True)
                 df.to_csv(filepath, index=False, encoding='utf-8-sig')
                 messagebox.showinfo("Éxito", f"El horario ha sido exportado correctamente en:\n{filepath}")
         except Exception as e:
@@ -552,9 +642,9 @@ class PantallaAlgoritmo(tk.Frame):
             self.ax.set_xlabel("Generaciones", fontweight='bold')
             self.ax.set_ylabel("Función de Aptitud", fontweight='bold')
             
-            # Ajuste dinámico del eje X para que coincida con las generaciones reales
-            max_x = max(1, configAG.generacion_actual - 1) if configAG.generacion_actual > 0 else 1
-            self.ax.set_xlim(0, max_x) 
+            # Ajuste dinámico del eje X para las generaciones
+            max_x_limit = max(1, configAG.generacion_actual)
+            self.ax.set_xlim(0, max_x_limit) 
             
             self.ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.3), ncol=2)
             
